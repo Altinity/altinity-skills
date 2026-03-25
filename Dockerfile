@@ -36,15 +36,29 @@ RUN bun install -g @openai/codex@${CODEX_VERSION} \
 
 COPY --from=mcp /bin/altinity-mcp /bin/altinity-mcp
 
+RUN mkdir -p /etc/claude-code \
+  && cat <<'EOF' > /etc/claude-code/managed-mcp.json
+{
+  "mcpServers": {
+    "clickhouse": {
+      "command": "/bin/altinity-mcp",
+      "args": ["--config", "/opt/expert-mcp/mcp-config.json", "--read-only", "1"]
+    }
+  }
+}
+EOF
+  && chmod 755 /etc/claude-code \
+  && chmod 644 /etc/claude-code/managed-mcp.json
+
 USER bun
 
 RUN mkdir -p /home/bun/.codex \
   && cat <<'EOF' > /home/bun/.codex/config.toml
-model = "gpt-5.2-codex"
+model = "gpt-5.4"
 model_reasoning_effort = "medium"
 web_search = "live"
 
 [mcp_servers.clickhouse]
 command = "/bin/altinity-mcp"
-args = ["--config","/etc/altinity-mcp/config.yaml"]
+args = ["--config","/opt/expert-mcp/config.yaml","--read-only", "1"]
 EOF
