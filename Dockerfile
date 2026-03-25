@@ -36,19 +36,18 @@ RUN bun install -g @openai/codex@${CODEX_VERSION} \
 
 COPY --from=mcp /bin/altinity-mcp /bin/altinity-mcp
 
-RUN mkdir -p /etc/claude-code \
-  && cat <<'EOF' > /etc/claude-code/managed-mcp.json
+RUN bash -lc "mkdir -p /etc/claude-code && cat > /etc/claude-code/managed-mcp.json <<'EOF'
 {
-  "mcpServers": {
-    "clickhouse": {
-      "command": "/bin/altinity-mcp",
-      "args": ["--config", "/opt/expert-mcp/mcp-config.json", "--read-only", "1"]
+  \"mcpServers\": {
+    \"clickhouse\": {
+      \"command\": \"/bin/altinity-mcp\",
+      \"args\": [\"--config\", \"/opt/expert-mcp/mcp-config.json\", \"--read-only\", \"1\"]
     }
   }
 }
 EOF
-  && chmod 755 /etc/claude-code \
-  && chmod 644 /etc/claude-code/managed-mcp.json
+chmod 755 /etc/claude-code
+chmod 644 /etc/claude-code/managed-mcp.json"
 
 USER bun
 
