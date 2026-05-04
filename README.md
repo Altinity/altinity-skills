@@ -10,67 +10,92 @@ This repository contains skills used for ClickHouse DB performance and schema an
 - On PRs and pushes to `main`, GitHub Actions packages changed skills and uploads zip files as workflow artifacts.
 - On tags matching `skills-v*`, GitHub Actions packages all skills and publishes them as GitHub Release assets.
 
-## Use installed skills
+## Installing Skills
 
-### Claude Code / Claude Desktop / opencode
-```
-/skill-name prompt message
-```
+### Claude Code (CLI)
 
-### Codex
-```
-$skill-name message
+**One-liner (recommended):**
+```bash
+npx skills add --agent claude-code Altinity/altinity-skills
 ```
 
-### Gemini Cli
-gemini doesn't have dedicated syntax for skill usage, so you need use prompt like that
+This installs all skills into `~/.claude/skills/`.
 
-```
-use skill skill-name message
+**Install a single skill:**
+```bash
+npx skills add --agent claude-code Altinity/altinity-skills/altinity-expert-clickhouse/skills/altinity-expert-clickhouse-overview
 ```
 
-## Install Skills
+**Manual install:**
+```bash
+git clone https://github.com/Altinity/altinity-skills.git
+# Copy a specific skill
+cp -r altinity-skills/altinity-expert-clickhouse/skills/altinity-expert-clickhouse-overview ~/.claude/skills/
+# Or symlink the whole skills directory
+ln -s "$(pwd)/altinity-skills/altinity-expert-clickhouse/skills" ~/.claude/skills/altinity-expert-clickhouse
+```
 
-### Universal via npx (bunx if you use bun)
+**Usage** — invoke a skill with a slash command:
 ```
-npx skills add --list Altinity/skills
-npx skills add Altinity/skills
+/altinity-expert-clickhouse-overview Analyze cluster health
+/altinity-profiler-clickhouse Profile this cluster and generate an analyst skill
 ```
+
+---
+
+### Claude.ai (web)
+
+1. Download skill zip files from the [latest GitHub Release](https://github.com/Altinity/altinity-skills/releases/latest).
+2. In Claude.ai, go to **Settings → Capabilities** (or **Admin Settings → Capabilities** for org-wide deployment).
+3. Click **Add Skill** and upload the zip file.
+
+Each skill is a separate zip. Upload as many as needed.
+
+---
 
 ### Codex CLI
 
-variants:
-- use $skill-installer skill inside codex
-- clone repo and copy needed skills into ~/.codex/skills directory.
-- clone repo and ln (symlink) repo's skill directory into ~/.codex
+**One-liner (recommended):**
+```bash
+npx skills add --agent codex Altinity/altinity-skills
+```
 
-### Claude CLI (Claude Code)
+This installs all skills into `~/.codex/skills/`.
 
-variants:
-- claude skills add URL
-- clone repo and copy needed skills into ~/.claude/skills directory.
-- clone repo and ln (symlink) repo's skill directory into ~/.claude
+**Manual install:**
+```bash
+git clone https://github.com/Altinity/altinity-skills.git
+# Copy a specific skill
+cp -r altinity-skills/altinity-expert-clickhouse/skills/altinity-expert-clickhouse-overview ~/.codex/skills/
+# Or symlink the whole skills directory
+ln -s "$(pwd)/altinity-skills/altinity-expert-clickhouse/skills" ~/.codex/skills/altinity-expert-clickhouse
+```
+
+**Usage** — invoke a skill with a dollar-sign prefix:
+```
+$altinity-expert-clickhouse-overview Analyze cluster health
+$altinity-profiler-clickhouse Profile this cluster and generate an analyst skill
+```
+
+---
 
 ### Gemini CLI
 
-Install an agent skill from a git repository URL or a local path. 
+```bash
+gemini skills install https://github.com/Altinity/altinity-skills
 ```
-gemini skills install <source> [--scope] [--path] 
-```
- 
-or manually:
 
-```sh
-git clone https://github.com/Altinity/Skills.git
+Or manually:
+```bash
+git clone https://github.com/Altinity/altinity-skills.git
 mkdir -p ~/.gemini/skills
-cp /absolute/path/to/Skills/altinity-expert-clickhouse/skills/altinity-expert-clickhouse-memory ~/.gemini/skills/
-# or
-ln -s /absolute/path/to/Skills/altinity-expert-clickhouse/skills ~/.gemini/skills/
+ln -s "$(pwd)/altinity-skills/altinity-expert-clickhouse/skills" ~/.gemini/skills/altinity-expert-clickhouse
 ```
 
-
-### Claude.ai (web)
-Download the zip files from https://github.com/Altinity/Skills/releases and upload them in Settings (or Admin Settings for org‑wide use) to Capabilities section.
+**Usage:**
+```
+use skill altinity-expert-clickhouse-overview Analyze cluster health
+```
 
 
 ## Docker Image
