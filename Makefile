@@ -3,7 +3,9 @@
 
 SKILLS_DIR := $(shell pwd)
 BUILD_DIR := $(SKILLS_DIR)/releases
-SKILL_DIRS := $(shell find altinity-expert-clickhouse/skills -maxdepth 2 -name "SKILL.md" ! -path "*/.system/*" -exec dirname {} \; | sort)
+SKILL_DIRS := $(shell \
+    find altinity-expert-clickhouse/skills -maxdepth 2 -name "SKILL.md" ! -path "*/.system/*" -exec dirname {} \; | sort; \
+    find . -mindepth 2 -maxdepth 2 -name "SKILL.md" ! -path "*/altinity-expert-clickhouse/*" ! -path "*/.git/*" ! -path "*/.github/*" -exec dirname {} \; | sed 's|^\./||' | sort)
 SKILL_ZIPS := $(foreach dir,$(SKILL_DIRS),$(BUILD_DIR)/$(notdir $(dir)).zip)
 
 .PHONY: all clean list help
@@ -17,7 +19,7 @@ $(BUILD_DIR):
 define ZIP_template
 $(BUILD_DIR)/$(notdir $(1)).zip: $(1)/SKILL.md
 	@echo "Packaging $(notdir $(1))..."
-	@cd $(1) && zip -r $(BUILD_DIR)/$(notdir $(1)).zip . -x "*.DS_Store" -x "*__MACOSX*" -x "*.git*"
+	@cd $(1) && zip -r $(BUILD_DIR)/$(notdir $(1)).zip . -x "*.DS_Store" -x "*__MACOSX*" -x "*.git*" -x "*__pycache__*" -x "*.pyc"
 endef
 
 $(foreach dir,$(SKILL_DIRS),$(eval $(call ZIP_template,$(dir))))

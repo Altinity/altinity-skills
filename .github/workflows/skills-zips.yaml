@@ -23,11 +23,13 @@ on:
       - 'skills-v*'
     paths:
       - 'altinity-expert-clickhouse/skills/**'
+      - 'altinity-profiler-clickhouse/**'
   pull_request:
     branches:
       - main
     paths:
       - 'altinity-expert-clickhouse/skills/**'
+      - 'altinity-profiler-clickhouse/**'
 
 jobs:
   build-skill-zips:
@@ -48,6 +50,8 @@ jobs:
           list_all_skills() {
             find altinity-expert-clickhouse/skills -mindepth 1 -maxdepth 1 -type d -name 'altinity-*' \
               -exec sh -c 'for d; do [ -f "$d/SKILL.md" ] && basename "$d"; done' sh {} + | sort -u
+            find . -mindepth 1 -maxdepth 1 -type d -name 'altinity-*' ! -name 'altinity-expert-clickhouse' \
+              -exec sh -c 'for d; do [ -f "$d/SKILL.md" ] && basename "$d"; done' sh {} + | sort -u
           }
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -63,7 +67,7 @@ jobs:
               BASE="$(git merge-base origin/main HEAD || true)"
               HEAD="${{ github.sha }}"
               if [ -n "$BASE" ]; then
-                git diff --name-only "$BASE" "$HEAD" | awk -F/ '/^altinity-expert-clickhouse\/skills\//{print $3}' | sort -u > /tmp/skills.txt
+                git diff --name-only "$BASE" "$HEAD" | awk -F/ '/^altinity-expert-clickhouse\/skills\//{print $3} /^altinity-[^\/]+\// && !/^altinity-expert-clickhouse\//{print $1}' | sort -u > /tmp/skills.txt
               else
                 list_all_skills > /tmp/skills.txt
               fi
@@ -73,16 +77,16 @@ jobs:
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
             BASE="${{ github.event.pull_request.base.sha }}"
             HEAD="${{ github.event.pull_request.head.sha }}"
-            git diff --name-only "$BASE" "$HEAD" | awk -F/ '/^altinity-expert-clickhouse\/skills\//{print $3}' | sort -u > /tmp/skills.txt
+            git diff --name-only "$BASE" "$HEAD" | awk -F/ '/^altinity-expert-clickhouse\/skills\//{print $3} /^altinity-[^\/]+\// && !/^altinity-expert-clickhouse\//{print $1}' | sort -u > /tmp/skills.txt
           else
             BEFORE="${{ github.event.before }}"
             SHA="${{ github.sha }}"
-            git diff --name-only "$BEFORE" "$SHA" | awk -F/ '/^altinity-expert-clickhouse\/skills\//{print $3}' | sort -u > /tmp/skills.txt
+            git diff --name-only "$BEFORE" "$SHA" | awk -F/ '/^altinity-expert-clickhouse\/skills\//{print $3} /^altinity-[^\/]+\// && !/^altinity-expert-clickhouse\//{print $1}' | sort -u > /tmp/skills.txt
           fi
 
           # Keep only existing skills (deleted skills are skipped for packaging).
           awk 'NF' /tmp/skills.txt | while read -r skill; do
-            [ -f "altinity-expert-clickhouse/skills/$skill/SKILL.md" ] && echo "$skill"
+            { [ -f "altinity-expert-clickhouse/skills/$skill/SKILL.md" ] || [ -f "$skill/SKILL.md" ]; } && echo "$skill"
           done | sort -u > /tmp/skills-final.txt
 
           skills="$(paste -sd' ' /tmp/skills-final.txt || true)"
@@ -96,10 +100,17 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           for skill in ${{ steps.changes.outputs.skills }}; do
-            dir="altinity-expert-clickhouse/skills/$skill"
+            if [ -f "altinity-expert-clickhouse/skills/$skill/SKILL.md" ]; then
+              dir="altinity-expert-clickhouse/skills/$skill"
+            elif [ -f "$skill/SKILL.md" ]; then
+              dir="$skill"
+            else
+              echo "WARNING: Skill directory not found for $skill, skipping." >&2
+              continue
+            fi
             zip_path="dist/${skill}.zip"
             echo "Packaging $skill..."
-            (cd "$dir" && zip -r "$GITHUB_WORKSPACE/$zip_path" . -x "*.DS_Store" -x "*__MACOSX*" -x "*.git*" -x ".system/*")
+            (cd "$dir" && zip -r "$GITHUB_WORKSPACE/$zip_path" . -x "*.DS_Store" -x "*__MACOSX*" -x "*.git*" -x ".system/*" -x "*__pycache__*" -x "*.pyc")
           done
 
       - name: Upload build artifact

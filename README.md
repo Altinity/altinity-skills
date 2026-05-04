@@ -4,6 +4,7 @@ This repository contains skills used for ClickHouse DB performance and schema an
 
 ## Core Skills
 - `altinity-expert-clickhouse/`: Modular ClickHouse diagnostic skill set. Each module is a standalone skill under `altinity-expert-clickhouse/skills/` (e.g., memory, merges, replication).
+- `altinity-profiler-clickhouse/`: Profiles a live ClickHouse cluster via MCP and generates a per-cluster analyst Skill (schema map, query patterns, engine idioms) that can be saved in claude.ai.
 
 ## Packaging and Releases
 - On PRs and pushes to `main`, GitHub Actions packages changed skills and uploads zip files as workflow artifacts.
