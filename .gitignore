@@ -4,3 +4,5 @@
 output/
 altinity-expert-clickhouse/skills/.system/
 releases/*.zip
+__pycache__/
+*.pyc
