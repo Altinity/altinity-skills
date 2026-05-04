@@ -1,0 +1,103 @@
+name: Profiler Skill Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publish GitHub Release from this run'
+        required: false
+        type: boolean
+        default: false
+      release_tag:
+        description: 'Release tag to publish (required when publish_release=true), e.g. profiler-v2026.05.04'
+        required: false
+        default: ''
+  push:
+    branches:
+      - main
+    tags:
+      - 'profiler-v*'
+    paths:
+      - 'altinity-profiler-clickhouse/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'altinity-profiler-clickhouse/**'
+
+jobs:
+  build-skill-zip:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build skill zip
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          echo "Packaging altinity-profiler-clickhouse..."
+          (cd altinity-profiler-clickhouse && zip -r "$GITHUB_WORKSPACE/dist/altinity-profiler-clickhouse.zip" . \
+            -x "*.DS_Store" -x "*__MACOSX*" -x "*.git*" -x "*__pycache__*" -x "*.pyc")
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: profiler-skill-zip
+          path: dist/altinity-profiler-clickhouse.zip
+          if-no-files-found: error
+
+  publish-github-release:
+    runs-on: ubuntu-latest
+    needs: build-skill-zip
+    if: startsWith(github.ref, 'refs/tags/profiler-v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_release == 'true')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: profiler-skill-zip
+          path: dist
+
+      - name: Resolve release tag
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" == refs/tags/profiler-v* ]]; then
+            tag="${GITHUB_REF#refs/tags/}"
+          else
+            tag="${{ github.event.inputs.release_tag }}"
+          fi
+
+          if [[ -z "$tag" ]]; then
+            echo "release_tag is required for manual publish runs." >&2
+            exit 1
+          fi
+          if [[ "$tag" != profiler-v* ]]; then
+            echo "release_tag must start with profiler-v, got: $tag" >&2
+            exit 1
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Render release notes from template
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ steps.meta.outputs.tag }}"
+          sed "s/{{TAG}}/${tag}/g" .github/release-notes-profiler.md > /tmp/release-notes.md
+
+      - name: Publish GitHub release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          body_path: /tmp/release-notes.md
+          files: dist/altinity-profiler-clickhouse.zip

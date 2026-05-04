@@ -7,8 +7,15 @@ This repository contains skills used for ClickHouse DB performance and schema an
 - `altinity-profiler-clickhouse/`: Profiles a live ClickHouse cluster via MCP and generates a per-cluster analyst Skill (schema map, query patterns, engine idioms) that can be saved in claude.ai.
 
 ## Packaging and Releases
-- On PRs and pushes to `main`, GitHub Actions packages changed skills and uploads zip files as workflow artifacts.
-- On tags matching `skills-v*`, GitHub Actions packages all skills and publishes them as GitHub Release assets.
+
+Each skill group has its own release workflow and tag scheme:
+
+| Skill group | Tag pattern | Workflow |
+|---|---|---|
+| `altinity-expert-clickhouse` | `expert-v*` | `.github/workflows/expert-skills.yaml` |
+| `altinity-profiler-clickhouse` | `profiler-v*` | `.github/workflows/profiler-skill.yaml` |
+
+On every PR / push to `main`, changed skills are packaged and uploaded as workflow artifacts. On a matching tag push, all skills in that group are packaged and published as GitHub Release assets.
 
 ## Installing Skills
 
