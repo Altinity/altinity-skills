@@ -21,8 +21,8 @@ ENV PATH="/opt/bun/bin:${PATH}"
 
 RUN bun install -g @openai/codex@${CODEX_VERSION} \
   && bun install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \
-  && bunx skills add --global --agent claude-code --yes Altinity/Skills \
-  && bunx skills add --global --agent codex --yes Altinity/Skills \
+  && bunx skills add --global --agent claude-code codex --yes Altinity/Skills/altinity-expert-clickhouse/ \
+  && bunx skills add --global --agent claude-code codex --yes Altinity/Skills/altinity-profiler-clickhouse/ \
   && codex --version \
   && claude --version \
   && chown -R bun:bun /home/bun /opt/bun
