@@ -23,7 +23,8 @@ On every PR / push to `main`, changed skills are packaged and uploaded as workfl
 
 **One-liner (recommended):**
 ```bash
-npx skills add --agent claude-code Altinity/altinity-skills
+npx skills add --agent claude-code Altinity/altinity-skills/altinity-expert-clickhouse/
+npx skills add --agent claude-code Altinity/altinity-skills/altinity-profiler-clickhouse/
 ```
 
 This installs all skills into `~/.claude/skills/`.
@@ -64,7 +65,8 @@ Each skill is a separate zip. Upload as many as needed.
 
 **One-liner (recommended):**
 ```bash
-npx skills add --agent codex Altinity/altinity-skills
+npx skills add --agent codex Altinity/altinity-skills/altinity-expert-clickhouse/
+npx skills add --agent codex Altinity/altinity-skills/altinity-profiler-clickhouse/
 ```
 
 This installs all skills into `~/.codex/skills/`.
@@ -89,7 +91,8 @@ $altinity-profiler-clickhouse Profile this cluster and generate an analyst skill
 ### Gemini CLI
 
 ```bash
-gemini skills install https://github.com/Altinity/altinity-skills
+npx skills add --agent gemini Altinity/altinity-skills/altinity-expert-clickhouse/
+npx skills add --agent gemini Altinity/altinity-skills/altinity-profiler-clickhouse/
 ```
 
 Or manually:
@@ -101,7 +104,7 @@ ln -s "$(pwd)/altinity-skills/altinity-expert-clickhouse/skills" ~/.gemini/skill
 
 **Usage:**
 ```
-use skill altinity-expert-clickhouse-overview Analyze cluster health
+use skill `altinity-expert-clickhouse-overview` Analyze cluster health
 ```
 
 
@@ -163,7 +166,7 @@ cd skills
 
 helm install my-audit ./helm/skills-agent \
   --set agent=codex \
-  --set model=gpt-5.2-codex \
+  --set model=gpt-5.3-codex \
   --set skillName=altinity-expert-clickhouse-overview \
   --set prompt="Analyze ClickHouse cluster health and summarize top risks" \
   --set-file credentials.codexAuth=~/.codex/auth.json
