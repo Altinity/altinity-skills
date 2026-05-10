@@ -1,0 +1,93 @@
+# ClickHouseInstallation (CHI) — single-shard, single-replica starting template.
+# Substitute placeholders below before applying.
+#
+# Placeholders:
+#   ${CH_NAMESPACE}               target namespace (also pass via -n)
+#   ${CH_SERVER_IMAGE}            fully-qualified server image tag from build skill
+#   ${CH_STORAGE_CLASS}           StorageClass for PVCs
+#   ${CH_STORAGE_SIZE}            per-replica disk size, e.g. 100Gi
+#   ${CH_DEFAULT_PASSWORD_SHA256} sha256 of default user password (production only)
+#
+# Production checklist:
+#   - shardsCount and replicasCount as required (replicasCount >= 2)
+#   - Keeper running with 3 nodes (separate CHK/CRD or external Keeper)
+#   - resources.requests / limits set (uncomment block below)
+#   - podDistribution / anti-affinity set
+#   - PodDisruptionBudget defined alongside this CHI
+#   - default user secured (uncomment users block below)
+
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: ch
+  namespace: ${CH_NAMESPACE}
+spec:
+  defaults:
+    templates:
+      podTemplate: clickhouse-pod
+      dataVolumeClaimTemplate: data
+      logVolumeClaimTemplate: log
+
+  configuration:
+    # Production: uncomment to set the default user password (sha256).
+    # users:
+    #   default/password_sha256_hex: ${CH_DEFAULT_PASSWORD_SHA256}
+    #   default/networks/ip:
+    #     - "::1"
+    #     - "127.0.0.1"
+
+    # Keeper / ZooKeeper reference. For production, point at a 3-node Keeper.
+    # zookeeper:
+    #   nodes:
+    #     - host: keeper-0.keeper.${CH_NAMESPACE}.svc.cluster.local
+    #     - host: keeper-1.keeper.${CH_NAMESPACE}.svc.cluster.local
+    #     - host: keeper-2.keeper.${CH_NAMESPACE}.svc.cluster.local
+
+    clusters:
+      - name: main
+        layout:
+          shardsCount: 1
+          replicasCount: 1   # production: >= 2
+
+  templates:
+    podTemplates:
+      - name: clickhouse-pod
+        spec:
+          containers:
+            - name: clickhouse
+              image: ${CH_SERVER_IMAGE}
+              imagePullPolicy: IfNotPresent
+              # Production: uncomment and tune.
+              # resources:
+              #   requests:
+              #     cpu: "2"
+              #     memory: "8Gi"
+              #   limits:
+              #     memory: "8Gi"
+          # Production: enable anti-affinity so replicas of the same shard
+          # don't land on the same node.
+          # affinity:
+          #   podAntiAffinity:
+          #     requiredDuringSchedulingIgnoredDuringExecution:
+          #       - labelSelector:
+          #           matchExpressions:
+          #             - key: clickhouse.altinity.com/chi
+          #               operator: In
+          #               values: [ch]
+          #         topologyKey: kubernetes.io/hostname
+
+    volumeClaimTemplates:
+      - name: data
+        spec:
+          storageClassName: ${CH_STORAGE_CLASS}
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: ${CH_STORAGE_SIZE}
+      - name: log
+        spec:
+          storageClassName: ${CH_STORAGE_CLASS}
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 10Gi

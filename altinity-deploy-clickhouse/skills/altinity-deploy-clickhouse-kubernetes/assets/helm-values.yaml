@@ -1,0 +1,39 @@
+# Altinity clickhouse-operator Helm values.
+# Adjust before installing. Verify the chart's expected schema against the
+# Altinity clickhouse-operator chart documentation — keys can change across
+# chart versions.
+
+operator:
+  # Pinned image tag. Match to the operator version chosen in Step 1.
+  image:
+    repository: altinity/clickhouse-operator
+    tag: ""           # e.g. "0.24.0" — never leave empty for production
+    pullPolicy: IfNotPresent
+
+  # Resource requests/limits for the operator pod itself.
+  # Production: keep these conservative — the operator is lightweight.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+  # RBAC scope.
+  # cluster-wide: operator watches CHIs in all namespaces (default).
+  # namespaced  : operator only watches its own namespace (set to true
+  #               if cluster-admin RBAC is restricted).
+  rbac:
+    create: true
+    namespaced: false
+
+# Metrics endpoint for Prometheus scraping. Production: enable.
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false   # set true if Prometheus Operator is installed
+
+# Pod placement.
+nodeSelector: {}
+tolerations: []
+affinity: {}
