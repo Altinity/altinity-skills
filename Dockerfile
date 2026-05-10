@@ -21,13 +21,6 @@ ENV PATH="/opt/bun/bin:${PATH}"
 
 RUN bun install -g @openai/codex@${CODEX_VERSION} \
   && bun install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \
-  && echo "toolchain_refresh=${TOOLCHAIN_REFRESH}" >/tmp/toolchain-refresh.txt \
-  && rm -f /usr/local/bin/codex \
-  && rm -f /usr/local/bin/claude \
-  && printf '%s\n' '#!/usr/bin/env bash' 'exec bun /opt/bun/install/global/node_modules/@openai/codex/bin/codex.js "$@"' > /usr/local/bin/codex \
-  && chmod +x /usr/local/bin/codex \
-  && printf '%s\n' '#!/usr/bin/env bash' 'exec bun /opt/bun/install/global/node_modules/@anthropic-ai/claude-code/cli.js "$@"' > /usr/local/bin/claude \
-  && chmod +x /usr/local/bin/claude \
   && bunx skills add --global --agent claude-code --yes Altinity/Skills \
   && bunx skills add --global --agent codex --yes Altinity/Skills \
   && codex --version \
