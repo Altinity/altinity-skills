@@ -3,6 +3,6 @@
 **/.claude/
 output/
 altinity-expert-clickhouse/skills/.system/
-releases/*.zip
+**/releases/*.zip
 __pycache__/
 *.pyc

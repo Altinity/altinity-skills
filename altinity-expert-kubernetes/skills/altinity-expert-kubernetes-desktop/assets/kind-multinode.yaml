@@ -1,0 +1,13 @@
+# kind multi-node cluster config — opt-in for altinity-deploy-clickhouse-k8s-desktop.
+# Creates 1 control-plane + 2 workers so the user can test pod anti-affinity,
+# PodDisruptionBudgets, and replica scheduling.
+#
+# Use:
+#   kind create cluster --name altinity-dev --config kind-multinode.yaml
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+  - role: worker
+  - role: worker

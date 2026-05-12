@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Container builds ship <listen_host>127.0.0.1</listen_host> + ::1 by default.
+  Those addresses are unreachable through Docker NAT. Bind to wildcard inside
+  the container; restrict *external* exposure via the published-port binding
+  in docker-compose.yml (e.g. "127.0.0.1:8123:8123") and host firewall rules.
+-->
+<clickhouse>
+    <listen_host>::</listen_host>
+    <listen_host>0.0.0.0</listen_host>
+    <listen_try>1</listen_try>
+</clickhouse>

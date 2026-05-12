@@ -1,0 +1,152 @@
+# ClickHouse on Kubernetes — ${INSTALL_LABEL}
+
+This directory holds the manifests and notes for a ClickHouse-on-Kubernetes
+install created by the `altinity-deploy-clickhouse-kubernetes` skill.
+
+Keep this directory if you want to reapply, modify, or tear down the install
+later — the manifests here are the source of truth.
+
+## What's installed
+
+<!-- KIND_BLOCK: keep if the cluster is a local kind cluster, otherwise remove -->
+- **Kubernetes**: kind cluster `${KIND_CLUSTER_NAME}`
+  (kubeconfig context: `kind-${KIND_CLUSTER_NAME}`)
+<!-- /KIND_BLOCK -->
+
+<!-- REMOTE_BLOCK: keep if pointing at a remote / pre-existing cluster, otherwise remove -->
+- **Kubernetes**: remote cluster (kubeconfig context: `${KUBE_CONTEXT}`)
+<!-- /REMOTE_BLOCK -->
+
+- **Operator**: Altinity clickhouse-operator `${OPERATOR_VERSION}` in namespace `clickhouse-operator`
+
+<!-- CH_BLOCK: keep if a ClickHouseInstallation has been applied -->
+- **ClickHouse**: ${CH_TOPOLOGY} in namespace `${CH_NAMESPACE}`
+  - CHI name: `${CHI_NAME}`
+  - Image: `${CH_SERVER_IMAGE}`
+<!-- /CH_BLOCK -->
+
+<!-- KEEPER_BLOCK: keep if a Keeper / ZooKeeper has been deployed alongside ClickHouse -->
+- **Keeper**: ${KEEPER_TOPOLOGY} in namespace `${KEEPER_NAMESPACE}`
+  - Image: `${KEEPER_IMAGE}`
+<!-- /KEEPER_BLOCK -->
+
+## Files
+
+- `kind/cluster.yaml` — kind cluster config (kind installs only)
+- `operator/clickhouse-operator-install-bundle.yaml` — operator manifests, pinned
+- `chi/installation.yaml` — ClickHouseInstallation custom resource
+- `notes/` — scratch space for logs, queries, ad-hoc notes
+
+## Start
+
+<!-- KIND_BLOCK -->
+If the kind cluster is not running:
+
+```bash
+kind create cluster --config kind/cluster.yaml
+```
+
+A new kind cluster has empty state, so reapply the operator and CHI:
+
+```bash
+kubectl apply -f operator/clickhouse-operator-install-bundle.yaml
+kubectl -n clickhouse-operator rollout status deployment/clickhouse-operator
+kubectl create namespace ${CH_NAMESPACE}
+kubectl apply -n ${CH_NAMESPACE} -f chi/installation.yaml
+```
+<!-- /KIND_BLOCK -->
+
+<!-- REMOTE_BLOCK -->
+The cluster persists; reapply only if the operator or CHI was deleted:
+
+```bash
+kubectl --context ${KUBE_CONTEXT} apply -f operator/clickhouse-operator-install-bundle.yaml
+kubectl --context ${KUBE_CONTEXT} apply -n ${CH_NAMESPACE} -f chi/installation.yaml
+```
+<!-- /REMOTE_BLOCK -->
+
+## Stop / tear down
+
+Stop only ClickHouse (keep the cluster and operator running):
+
+```bash
+kubectl delete -n ${CH_NAMESPACE} -f chi/installation.yaml
+```
+
+Remove the operator and CRDs as well:
+
+```bash
+kubectl delete -f operator/clickhouse-operator-install-bundle.yaml
+```
+
+<!-- KIND_BLOCK -->
+Delete the entire kind cluster (fastest reset):
+
+```bash
+kind delete cluster --name ${KIND_CLUSTER_NAME}
+```
+<!-- /KIND_BLOCK -->
+
+<!-- CH_BLOCK -->
+## Connect to ClickHouse
+
+Port-forward the ClickHouse service to your host:
+
+```bash
+kubectl -n ${CH_NAMESPACE} port-forward svc/clickhouse-${CHI_NAME} 8123:8123 9000:9000
+```
+
+In another terminal:
+
+```bash
+# HTTP interface
+curl 'http://localhost:8123/?query=SELECT+version()'
+
+# Native client (if clickhouse-client is installed locally)
+clickhouse-client --host=localhost --port=9000
+
+# Or exec straight into the pod
+kubectl -n ${CH_NAMESPACE} exec -it chi-${CHI_NAME}-${CH_CLUSTER_NAME}-0-0-0 \
+  -- clickhouse-client
+```
+
+Useful sanity checks once connected:
+
+```sql
+SELECT version();
+SELECT * FROM system.clusters;
+SELECT name FROM system.databases;
+```
+<!-- /CH_BLOCK -->
+
+<!-- KEEPER_BLOCK -->
+## Connect to ClickHouse Keeper
+
+Keeper speaks the ZooKeeper wire protocol on port 9181 (Keeper's default).
+
+```bash
+kubectl -n ${KEEPER_NAMESPACE} port-forward svc/${KEEPER_SERVICE} 9181:9181
+```
+
+Inspect via `clickhouse-keeper-client` from inside a pod:
+
+```bash
+kubectl -n ${KEEPER_NAMESPACE} exec -it ${KEEPER_POD} \
+  -- clickhouse-keeper-client --host localhost --port 9181
+```
+
+Quick health probe via 4-letter words:
+
+```bash
+echo mntr | nc localhost 9181
+echo ruok | nc localhost 9181   # expect "imok"
+```
+
+From inside ClickHouse, the Keeper connection state is in
+`system.zookeeper_connection` and znodes are browseable via `system.zookeeper`:
+
+```sql
+SELECT * FROM system.zookeeper_connection;
+SELECT name FROM system.zookeeper WHERE path = '/';
+```
+<!-- /KEEPER_BLOCK -->
