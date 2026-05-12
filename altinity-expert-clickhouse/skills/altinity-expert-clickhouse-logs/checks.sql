@@ -50,6 +50,7 @@ where database='system' and name like '%_log'
  and engine_full not like '% TTL %'
 ;
 
+-- system logs shall not allocate more than 20% available disk space
 with used.sp/free.sp as ratio,
     max(ratio) as max_ratio
 SELECT
