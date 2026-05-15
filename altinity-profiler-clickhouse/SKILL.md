@@ -1,5 +1,5 @@
 ---
-name: clickhouse-profiler
+name: altinity-clickhouse-profiler
 description: |
   Profile a ClickHouse cluster via MCP and emit a per-cluster "analyst" Skill
   the user can save in claude.ai. Activate when the user asks to "profile
@@ -10,10 +10,7 @@ description: |
   Altinity MCP server). Outputs a 5-file markdown bundle plus a README.
 ---
 
-# clickhouse-profiler
-
-You are running the clickhouse-profiler Skill. Your job is to profile the
-target ClickHouse cluster via the MCP `execute_query` tool, then write out a
+Your job is to profile the target ClickHouse cluster via the MCP `execute_query` tool, then write out a
 per-cluster `<name>-analyst/` folder of 6 markdown files the user will save
 as a new Skill (or use to overwrite an existing one).
 
