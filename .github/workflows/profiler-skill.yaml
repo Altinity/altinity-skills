@@ -1,8 +1,5 @@
 name: Profiler Skill Package
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 on:
   workflow_dispatch:
     inputs:
@@ -20,8 +17,6 @@ on:
       - main
     tags:
       - 'profiler-v*'
-    paths:
-      - 'altinity-profiler-clickhouse/**'
   pull_request:
     branches:
       - main
@@ -35,7 +30,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Build skill zip
         shell: bash
@@ -47,7 +42,7 @@ jobs:
             -x "*.DS_Store" -x "*__MACOSX*" -x "*.git*" -x "*__pycache__*" -x "*.pyc")
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: profiler-skill-zip
           path: dist/altinity-profiler-clickhouse.zip
@@ -61,10 +56,10 @@ jobs:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: profiler-skill-zip
           path: dist
@@ -99,7 +94,7 @@ jobs:
           sed "s/{{TAG}}/${tag}/g" .github/release-notes-profiler.md > /tmp/release-notes.md
 
       - name: Publish GitHub release assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           body_path: /tmp/release-notes.md
