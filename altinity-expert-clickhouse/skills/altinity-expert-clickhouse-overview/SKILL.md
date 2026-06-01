@@ -1,22 +1,21 @@
 ---
 name: altinity-expert-clickhouse-overview
-description: Runs a quick overview of Clickhouse server health.
+description: Runs a fast ClickHouse server health snapshot and routes to specialist skills. Use as the entry point for general health checks or when the problem area is not yet known.
+license: Apache-2.0
 ---
-
-## Analyze
 
 ## Predefined SQL
 
-Run reporting SQL queries from files in Skill directory:
-- checks.sql 
+Run reporting SQL queries from these files in this skill's directory:
+- checks.sql
 - metrics.sql
 - ddl_queue.sql
 
 Inline SQL below (version/enablement sensitive):
 
-### Detached Parts 
+### Detached Parts
 
-version-dependent: ClickHouse 23.8 does not have modification_time 
+version-dependent: ClickHouse 23.8 does not have modification_time
 
 ```sql
 SELECT
@@ -34,7 +33,7 @@ ORDER BY detached_parts DESC
 LIMIT 100
 ```
 
-### Text Log 
+### Text Log
 (may be disabled)
 
 ```sql
@@ -81,7 +80,7 @@ WHERE pool_size > 0
 ORDER BY utilization_pct DESC
 ```
 
-On error and for clickhouse version <= 22.8 replace system.server_settings to system.settings 
+On error and for clickhouse version <= 22.8 replace system.server_settings to system.settings
 
 ## Report
 

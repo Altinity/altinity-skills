@@ -1,6 +1,6 @@
 # clickhouse-profiler · pipeline SQL recipes
 
-Full SQL for the 8 phases of the profiler pipeline. Consult this file when
+Full SQL for the profiler pipeline (phases 0–8). Consult this file when
 SKILL.md instructs you to run a phase. SQL assumes you have a read-only
 `execute_query` MCP tool available.
 
@@ -168,8 +168,8 @@ Compute shares as `<count> / biz_tabs` for each.
 
 ### 1.5b. Decision (first-match-wins)
 
-The runtime version of `audit-groups.md` §Methodology lives in
-`archetypes/README.md`. Apply rules in order, **first match wins**:
+The archetype routing rules live in `archetypes/README.md`. Apply them
+in order, **first match wins**:
 
 | # | Rule | Archetype |
 |---|---|---|
@@ -793,7 +793,7 @@ Inputs:
   for tables not flagged by name.
 - `--archetype` (optional): the Phase 1.5 primary archetype letter.
   When `B` and the cluster has > 5000 business tables (huge-enterprise
-  sub-pattern from `audit-groups.md` rule 1), the helper raises the
+  sub-pattern from `archetypes/README.md` rule 1), the helper raises the
   service-user dominance threshold and is more aggressive on Rule 2.
   No effect for other archetypes — they share the default thresholds.
 

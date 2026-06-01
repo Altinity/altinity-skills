@@ -4,5 +4,12 @@
 output/
 altinity-expert-clickhouse/skills/.system/
 releases/*.zip
+*.zip
 __pycache__/
 *.pyc
+
+# OS / editor cruft
+.DS_Store
+**/.DS_Store
+.idea/
+**/.idea/

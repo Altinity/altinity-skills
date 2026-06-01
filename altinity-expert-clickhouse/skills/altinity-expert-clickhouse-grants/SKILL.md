@@ -1,11 +1,12 @@
 ---
 name: altinity-expert-clickhouse-grants
 description: Diagnose and resolve ClickHouse grant and authentication errors, especially after upgrades. Use when queries fail with ACCESS_DENIED/NOT_ENOUGH_PRIVILEGES, AUTHENTICATION_FAILED/WRONG_PASSWORD/REQUIRED_PASSWORD, or ON CLUSTER privilege errors; when system.* or INFORMATION_SCHEMA access is denied; or when grant behavior changes after version upgrades.
+license: Apache-2.0
 ---
 
 ## Diagnostics
 
-Run all queries from the file checks.sql and analyze the results.
+Run all queries from `checks.sql` in this skill's directory and analyze the results.
 
 ## Propose Minimal Grants
 Provide the smallest set of `GRANT` statements that match observed `needed_grant` values. Prefer role-based grants when the user already uses roles.

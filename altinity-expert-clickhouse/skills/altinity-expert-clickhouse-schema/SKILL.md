@@ -1,6 +1,7 @@
 ---
 name: altinity-expert-clickhouse-schema
 description: Analyze ClickHouse table structure, partitioning, ORDER BY keys, materialized views, and identify schema design anti-patterns. Use for table design issues and optimization.
+license: Apache-2.0
 ---
 
 # Table Schema and Design Analysis
@@ -11,7 +12,7 @@ Analyze table structure, partitioning, ORDER BY, materialized views, and identif
 
 ## Diagnostics
 
-Run all queries from the file checks.sql and analyze the results.
+Run all queries from `checks.sql` in this skill's directory and analyze the results.
 
 ---
 

@@ -83,7 +83,7 @@ make test-overview USE_DOCKER=0
 
 ## Build Release Zips
 
-From repo root (`/Users/bvt/work/Skills`):
+From the repository root:
 
 ```sh
 make

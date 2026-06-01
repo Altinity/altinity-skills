@@ -1,11 +1,12 @@
 ---
 name: altinity-expert-clickhouse-kafka
 description: Diagnose ClickHouse Kafka engine health, consumer status, thread pool capacity, and consumption issues. Use for Kafka lag, consumer errors, and thread starvation.
+license: Apache-2.0
 ---
 
 ## Diagnostics
 
-Run all queries from the file checks.sql and analyze the results.
+Run all queries from `checks.sql` in this skill's directory and analyze the results.
 
 ---
 
@@ -43,14 +44,14 @@ The `exceptions` column is a tuple of arrays with matching indices — `exceptio
 
 ## Advanced Diagnostics
 
-For deeper investigation, run queries from advanced_checks.sql:
+For deeper investigation, run queries from `advanced_checks.sql` in this skill's directory:
 
 - **Consumer exception drill-down** — filter to a specific problematic Kafka table
 - **Consumption speed measurement** — snapshot-based rate calculation
 - **Topic lag via rdkafka_stat** — total lag per table and per-partition breakdown
 - **Broker connection health** — connection state, errors, disconnects
 
-**Important:** `rdkafka_stat` is **not enabled by default** in ClickHouse. It requires `<statistics_interval_ms>` in the Kafka engine settings. See advanced_checks.sql for setup instructions.
+**Important:** `rdkafka_stat` is **not enabled by default** in ClickHouse. It requires `<statistics_interval_ms>` in the Kafka engine settings. See `advanced_checks.sql` for setup instructions.
 
 ---
 

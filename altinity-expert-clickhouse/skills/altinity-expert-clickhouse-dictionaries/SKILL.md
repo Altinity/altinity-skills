@@ -1,6 +1,7 @@
 ---
 name: altinity-expert-clickhouse-dictionaries
 description: Analyze ClickHouse external dictionaries including configuration, memory usage, reload status, and performance. Use for dictionary issues and load failures.
+license: Apache-2.0
 ---
 
 # Dictionary Diagnostics
@@ -11,7 +12,7 @@ Analyze external dictionaries: configuration, memory usage, reload status, and p
 
 ## Diagnostics
 
-Run all queries from the file checks.sql and analyze the results.
+Run all queries from `checks.sql` in this skill's directory and analyze the results.
 
 ---
 

@@ -1,6 +1,7 @@
 ---
 name: altinity-expert-clickhouse-memory
 description: Diagnose ClickHouse RAM usage, OOM errors, memory pressure, and allocation patterns. Use for memory-related issues and out-of-memory errors.
+license: Apache-2.0
 ---
 
 # Memory Usage and OOM Diagnostics
@@ -11,7 +12,7 @@ Diagnose RAM usage, memory pressure, OOM risks, and memory allocation patterns.
 
 ## Diagnostics
 
-Run all queries from the file checks.sql and analyze the results.
+Run all queries from `checks.sql` in this skill's directory and analyze the results.
 
 ---
 

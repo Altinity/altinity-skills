@@ -1,6 +1,7 @@
 ---
 name: altinity-expert-clickhouse-storage
 description: Diagnose ClickHouse disk usage, compression efficiency, part sizes, and storage bottlenecks. Use for disk space issues and slow IO.
+license: Apache-2.0
 ---
 
 # Storage and Disk Usage Analysis
@@ -11,7 +12,7 @@ Diagnose disk usage, compression efficiency, part sizes, and storage bottlenecks
 
 ## Diagnostics
 
-Run all queries from the file checks.sql and analyze the results.
+Run all queries from `checks.sql` in this skill's directory and analyze the results.
 
 ---
 

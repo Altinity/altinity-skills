@@ -1,12 +1,13 @@
 ---
 name: altinity-expert-clickhouse-index-analysis
 description: Analyze whether ClickHouse indexes (PRIMARY KEY, ORDER BY, skipping indexes, projections) are being used effectively for actual query patterns. Use when investigating index effectiveness, ORDER BY key design, query-to-index alignment, or when queries scan more data than expected.
+license: Apache-2.0
 ---
 
 
 ## Diagnostics
 
-Run all queries from the file checks.sql and analyze the results.
+Run all queries from `checks.sql` in this skill's directory and analyze the results.
 
 ---
 
@@ -27,7 +28,7 @@ EXPLAIN indexes = 1
 ### Column Cardinality Analysis
 
 ```sql
-SELECT 
+SELECT
     {columns} APPLY uniq
 FROM {database}.{table}
 WHERE {time_column} > now() - INTERVAL {days} DAY

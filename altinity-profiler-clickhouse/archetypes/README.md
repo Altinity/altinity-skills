@@ -26,9 +26,8 @@ the signature card and phase emphasis come from the primary.
 | D | Star+Dictionary | `D-star-dict.md` | `Dictionary` ≥ 3% AND `MaterializedView` ≥ 10% |
 | E | Streaming/Federation | `E-streaming-fed.md` | `Kafka` count ≥ 15 OR external engines (`MySQL`+`PostgreSQL`+`URL`+`S3`+`S3Queue`) ≥ 30 tables or ≥ 30% |
 
-Authoritative rules live in
-`/Users/Workspaces/otel/skill-draft/specs/audit-groups.md` §Methodology;
-the runtime version below is a faithful copy with no logic changes.
+The decision rules below are authoritative; apply them as the runtime
+source of truth for archetype routing.
 
 ## Decision rules (first-match-wins)
 

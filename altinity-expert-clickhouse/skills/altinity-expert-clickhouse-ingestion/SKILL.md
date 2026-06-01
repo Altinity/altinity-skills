@@ -1,11 +1,12 @@
 ---
 name: altinity-expert-clickhouse-ingestion
 description: Diagnose ClickHouse INSERT performance, batch sizing, part creation patterns, and ingestion bottlenecks. Use for slow inserts and data pipeline issues.
+license: Apache-2.0
 ---
 
 ## Diagnostics
 
-Run all queries from the file checks.sql and analyze the results.
+Run all queries from `checks.sql` in this skill's directory and analyze the results.
 
 ## Problem-Specific Investigation
 

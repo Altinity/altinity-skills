@@ -1,6 +1,7 @@
 ---
 name: altinity-expert-clickhouse-caches
 description: Analyze ClickHouse cache systems including mark cache, uncompressed cache, and query cache. Use for cache hit ratio issues and cache tuning.
+license: Apache-2.0
 ---
 
 # Cache Analysis and Tuning
@@ -11,7 +12,7 @@ Analyze ClickHouse cache systems: mark cache, uncompressed cache, query cache, a
 
 ## Diagnostics
 
-Run all queries from the file checks.sql and analyze the results.
+Run all queries from `checks.sql` in this skill's directory and analyze the results.
 
 ---
 

@@ -1,6 +1,7 @@
 ---
 name: altinity-expert-clickhouse-connection
-description: Should be used when doing clickhouse analysis and diagnostics review before any altinity-expert-clickhouse skill to test clickhouse connection and set general rules
+description: Establishes the ClickHouse connection mode, cluster macro, and default log timeframe for diagnostics. Use first, before any other altinity-expert-clickhouse skill, to verify connectivity and set shared analysis rules.
+license: Apache-2.0
 ---
 
 ## Connection mode
@@ -16,11 +17,11 @@ select
     (select value from system.asynchronous_metrics where metric = 'OSMemoryTotal') as os_memory_total
 ```
 
-### MCP mode 
+### MCP mode
 
 Try to use MCP server with clickhouse in the name.
 If multiple ClickHouse MCP servers are available, ask the user which one to use.
-When executing queries by the MCP server, push a single SQL statement to the MCP server (no multy query!)
+When executing queries by the MCP server, push a single SQL statement to the MCP server (no multi-query!)
 
 ### Exec mode (clickhouse-client)
 
@@ -42,14 +43,14 @@ When executing queries by the MCP server, push a single SQL statement to the MCP
 -- Use this pattern for system.*_log tables and system.errors time filters:
 -- WHERE event_time >= now() - INTERVAL 24 HOUR
 ```
-- never expend time window without an explicit user prompt. If needed, ask user to extend time window
+- never extend the time window without an explicit user prompt. If needed, ask the user to extend it
 
-## Schema-safe rule 
+## Schema-safe rule
 
 - If a query fails with `UNKNOWN_IDENTIFIER`, run `DESCRIBE TABLE system.<table>` and drop/adjust only the missing columns.
 - If a query fails with `UNKNOWN_TABLE`, skip that query and note the table is disabled or unavailable (e.g., `system.part_log`, `system.detached_parts`).
 
-## Report Output 
+## Report Output
 
 In all reports, always provide a header with information:
 - Connection mode used: MCP or clickhouse-client

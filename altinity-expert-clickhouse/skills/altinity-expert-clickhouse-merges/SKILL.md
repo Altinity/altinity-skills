@@ -1,12 +1,13 @@
 ---
 name: altinity-expert-clickhouse-merges
 description: Diagnose ClickHouse merge performance, part backlog, and 'too many parts' errors. Use for merge issues and part management problems.
+license: Apache-2.0
 ---
 
 
 ## Diagnostics
 
-Run all queries from `checks.sql` (cluster-wide) one by one and produce a decision-ready report.
+Run all queries from `checks.sql` in this skill's directory (cluster-wide) one by one and produce a decision-ready report.
 
 ## Triage Order (Mandatory)
 
@@ -66,15 +67,15 @@ Check system.merge_tree_settings if modified
 Suggest changing (reducing or increasing) in case of a problem as remediation.
 
 - max_parts_to_merge_at_once
-- max_bytes_to_merge_at_max_space_in_pool 
-- max_bytes_to_merge_at_min_space_in_pool 
-- enable_vertical_merge_algorithm 
-- vertical_merge_algorithm_min_rows_to_activate 
-- vertical_merge_algorithm_min_columns_to_activate 
-- max_number_of_merges_with_ttl_in_pool 
-- max_replicated_merges_with_ttl_in_queue 
-- parts_to_delay_insert 
-- parts_to_throw_insert 
+- max_bytes_to_merge_at_max_space_in_pool
+- max_bytes_to_merge_at_min_space_in_pool
+- enable_vertical_merge_algorithm
+- vertical_merge_algorithm_min_rows_to_activate
+- vertical_merge_algorithm_min_columns_to_activate
+- max_number_of_merges_with_ttl_in_pool
+- max_replicated_merges_with_ttl_in_queue
+- parts_to_delay_insert
+- parts_to_throw_insert
 
 
 ## Structural Fix Guidance (When Settings Are Not Enough)

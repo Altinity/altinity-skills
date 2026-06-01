@@ -19,7 +19,7 @@ Decision rules match pipeline.md §6.
 Archetype-aware demotion (pipeline.md §1.5 → §6): when the primary
 archetype is `B` (sharded OLAP) and the cluster has a large number of
 business tables (the huge-enterprise sub-pattern from
-`audit-groups.md` rule 1, threshold ~5000 biz tables), the helper is
+`archetypes/README.md` rule 1, threshold ~5000 biz tables), the helper is
 more aggressive on Rule 2 (service-users-only) by lowering the
 "all users service" requirement to "≥ 90% service users" — large B
 clusters tend to have a long tail of one-off human queries on tables
@@ -58,7 +58,7 @@ PER_TENANT_PATTERN = re.compile(r"_[0-9a-f]{8,}_")
 SHADOW_TRAFFIC_PATTERN = re.compile(r"_test_v\d+$")
 SHADOW_TRAFFIC_RIVAL_RATIO = 0.5  # exec count >= 50% of base counts as live
 
-# Huge-enterprise sub-pattern of archetype B (rule 1 in audit-groups.md):
+# Huge-enterprise sub-pattern of archetype B (rule 1 in archetypes/README.md):
 # clusters with this many business tables get more aggressive Rule 2
 # enforcement — the long tail of one-off human queries against
 # pipeline tables otherwise floods the analyst-hot set.

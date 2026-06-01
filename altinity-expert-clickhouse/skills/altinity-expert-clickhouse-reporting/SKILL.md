@@ -1,6 +1,7 @@
 ---
 name: altinity-expert-clickhouse-reporting
 description: Diagnose ClickHouse SELECT query performance, analyze query patterns, identify slow queries, and find optimization opportunities. Use for query latency and timeout issues.
+license: Apache-2.0
 ---
 
 # Query Performance Analysis
@@ -11,7 +12,7 @@ Diagnose SELECT query performance issues, analyze query patterns, and identify o
 
 ## Diagnostics
 
-Run all queries from the file checks.sql and analyze the results.
+Run all queries from `checks.sql` in this skill's directory and analyze the results.
 
 ---
 

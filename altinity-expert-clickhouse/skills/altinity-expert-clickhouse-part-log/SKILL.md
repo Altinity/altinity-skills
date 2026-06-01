@@ -1,11 +1,12 @@
 ---
 name: altinity-expert-clickhouse-part-log
 description: Diagnose ClickHouse issues by analyzing system.part_log (part creation, merges, mutations, downloads, removals, moves). Use for too many parts / micro-batch inserts, merge backlog or slow merges, mutation storms (ALTER DELETE/UPDATE), unusual replication DownloadPart churn, unexpected RemovePart spikes, or ZooKeeper/Keeper znode growth correlated with part activity.
+license: Apache-2.0
 ---
 
 # Part Log Based Diagnostics
 
-Run all queries from `checks.sql` (cluster-wide) and interpret the top offenders by **rate** (events/min), **volume** (rows/bytes), and **errors**.
+Run all queries from `checks.sql` in this skill's directory (cluster-wide) and interpret the top offenders by **rate** (events/min), **volume** (rows/bytes), and **errors**.
 
 Notes:
 - Default timeframes are relative (e.g., last 1h/6h/24h). Only switch to an explicit time range when the user provides one in the prompt.

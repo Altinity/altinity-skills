@@ -1,6 +1,7 @@
 ---
 name: altinity-expert-clickhouse-metrics
 description: Real-time monitoring of ClickHouse metrics, events, and asynchronous metrics. Use for load average, connections, queue monitoring, and resource saturation.
+license: Apache-2.0
 ---
 
 # Real-Time Metrics Monitoring
@@ -11,7 +12,7 @@ Real-time monitoring of ClickHouse metrics, events, and asynchronous metrics.
 
 ## Diagnostics
 
-Run all queries from the file checks.sql and analyze the results.
+Run all queries from `checks.sql` in this skill's directory and analyze the results.
 
 ---
 

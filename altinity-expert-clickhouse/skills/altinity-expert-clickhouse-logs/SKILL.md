@@ -1,11 +1,12 @@
 ---
 name: altinity-expert-clickhouse-logs
 description: Analyze ClickHouse system log table health including TTL configuration, disk usage, freshness, and cleanup. Use for system log issues and TTL configuration.
+license: Apache-2.0
 ---
 
 ## Diagnostics
 
-Run all queries from the file checks.sql and analyze the results.
+Run all queries from `checks.sql` in this skill's directory and analyze the results.
 
 ## TTL Recommendations
 

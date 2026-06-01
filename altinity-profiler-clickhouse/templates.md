@@ -606,8 +606,9 @@ latest event, ETL lag.>
 # <cluster>-analyst — Skill bundle notes
 
 **What this is**: a per-cluster ClickHouse analyst Skill produced by the
-`clickhouse-profiler` Skill. Save the files in this folder as a Skill in
-claude.ai (Settings → Capabilities → Add Skill; upload zip or folder).
+`clickhouse-profiler` Skill. Save the files in this folder as a Skill — in claude.ai (Settings →
+Capabilities → Add Skill; upload zip or folder), or by placing the folder
+in your agent's skills directory (e.g. Claude Code / Codex).
 
 ## Source
 
@@ -694,9 +695,11 @@ staleness section.
 ## How to use this Skill
 
 1. Compress this folder: `zip -r <name>-analyst.zip <name>-analyst/`.
-2. In claude.ai, go to Settings → Capabilities → Add Skill.
-3. Upload the zip (or the folder directly, if supported).
-4. The Skill's `description` auto-triggers it when you query this cluster.
+2. Install the Skill:
+   - claude.ai: Settings → Capabilities → Add Skill, upload the zip
+     (or the folder directly, if supported).
+   - Claude Code / Codex: place the folder in your skills directory.
+3. The Skill's `description` auto-triggers it when you query this cluster.
 
 ## How to regenerate
 

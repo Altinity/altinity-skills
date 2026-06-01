@@ -1,5 +1,6 @@
 ---
-name: altinity-clickhouse-profiler
+name: altinity-profiler-clickhouse
+license: Apache-2.0
 description: |
   Profile a ClickHouse cluster via MCP and emit a per-cluster "analyst" Skill
   the user can save in claude.ai. Activate when the user asks to "profile
@@ -88,18 +89,17 @@ README.md      — meta: source, decisions, limitations, how to regenerate,
 ```
 
 Target: ~5k–10k words total (user may pick "concise" or "full" via
-questionnaire). The user saves this folder as a claude.ai Skill.
+questionnaire). The user saves this folder as a Skill (claude.ai Settings → Capabilities, or their agent's skills directory).
 
 ## What this Skill is NOT
 
 - Not an ad-hoc query assistant. You are writing a **persistent artifact**.
 - Not a live debugger. You don't run `OPTIMIZE`, `ALTER`, `ATTACH`, etc.
-- Not a general ClickHouse tutorial. The artifact carries **only
-  cluster-specific knowledge**; generic engine docs are omitted (the
-  consumer model already knows them).
-- Not a SQL recipe generator. The artifact teaches the analyst the
-  engine-level facts and lets it compose queries; it does not prescribe
-  query shapes for question classes.
+- Not a general ClickHouse tutorial, and not a SQL recipe generator.
+  The artifact carries **only cluster-specific knowledge** — generic
+  engine docs are omitted (the consumer already knows them), and it
+  teaches engine-level facts rather than prescribing query shapes for
+  question classes (see Philosophy).
 
 ## Hard rules (apply always)
 
@@ -141,27 +141,14 @@ questionnaire). The user saves this folder as a claude.ai Skill.
    convention).
 8. **Verify before asserting (anti-hallucination).** Before any
    non-trivial fact lands in the artifact, run the matching verification
-   per the three claim types in the philosophy section above:
-   - **Existence**: query `system.tables` / `system.columns` for every
-     identifier you plan to name. Drop the fact if the referent does not
-     exist on this cluster. (No `spatialrss.authors` when only
-     `mstuserinformation_new` exists; no `page_stats.createddate` when
-     the column is `p_recorddate`.)
-   - **Behavior**: run `EXPLAIN indexes=1` and a representative
-     `SELECT … SETTINGS log_queries=1` with a unique comment token; pull
-     the captured `read_rows`, granule prune, latency from
-     `system.query_log` and embed the numbers next to the claim.
-     Unmeasurable claims demote to `inferred from schema`.
-   - **Relationship**: run the cardinality probe (matched / distinct_left
-     / distinct_right / avg_fanout) for every JOIN you plan to document.
-     Mark every relationship `[inferred]` regardless. Probe failure
-     demotes to `unverified: <reason>`, claim still stands but with the
-     marker.
-
-   Hallucinated identifiers (table/column names that don't exist) are the
-   most damaging failure mode — they survive review when wrapped in
-   plausible-looking SQL, then break at consumer query time. The
-   existence check is cheap; run it for every name.
+   for its claim type per the "Anti-hallucination" section above
+   (existence → drop if absent; behavior → embed captured numbers or
+   demote to `inferred from schema`; relationship → mark `[inferred]`
+   and attach the cardinality probe). Hallucinated identifiers
+   (table/column names that don't exist) are the most damaging failure
+   mode — they survive review wrapped in plausible-looking SQL, then
+   break at consumer query time. The existence check is cheap; run it
+   for every name.
 9. **Carry the verification artifact into the bundle.** When a claim was
    verified by query, attach a one-line verification record inline
    (`verified 2026-04-25; read_rows=734,350; query_id=…`). Reviewers can
@@ -200,7 +187,7 @@ questionnaire). The user saves this folder as a claude.ai Skill.
 - Target system is not ClickHouse (PostgreSQL, MySQL, BigQuery, Snowflake).
   This Skill is ClickHouse-specific.
 
-## Pipeline overview (10 phases)
+## Pipeline overview (phases 0–8)
 
 ```
 Phase 0 · Connect and detect shape     → CH version, query_log shape,
@@ -409,15 +396,11 @@ A good artifact:
   canned SQL recipes for question classes**. Templates are fine for
   illustrating shape; prescriptions for "the answer to question X is
   this query" are not.
-- Every named table and column was verified by `system.tables` /
-  `system.columns` at profile time. No hallucinated identifiers.
-- Every behavior claim (FINAL amplifies, primary key prunes, skip index
-  used) carries either a captured measurement (`read_rows`,
-  `granules_prune_pct`, `query_id`, `verified_at`) or an explicit
-  `inferred from schema` marker.
-- Every JOIN claim is marked `[inferred]` and includes the captured
-  cardinality probe (matched, distinct_left, distinct_right, avg_fanout)
-  alongside the join key.
+- Satisfies the verification contract (above): every named identifier
+  checked against `system.tables`/`system.columns` (no hallucinations);
+  every behavior claim carries a captured measurement (`read_rows`,
+  `granules_prune_pct`, `query_id`, `verified_at`) or an `inferred from
+  schema` marker; every JOIN is `[inferred]` with its cardinality probe.
 - README's verification log lists what was checked vs. inferred.
 - Explicitly lists demoted infra tables in pipeline.md.
 - Flags limitations honestly (thin query log, empty `system.dictionaries`,
@@ -430,14 +413,12 @@ A bad artifact:
 - Has engine idioms for engines not present.
 - Has hallucinated Dictionary attributes when `system.dictionaries` was
   empty.
-- Names a table or column that doesn't exist on the cluster (e.g. a join
-  to `spatialrss.authors` when the real table is
-  `mstuserinformation_new`; a filter on `page_stats.createddate` when
-  the real column is `p_recorddate`). This is the worst failure mode —
-  it survives to consumer-query time and produces silent errors.
-- Asserts a JOIN as if it were declared (no `[inferred]` marker).
-- Asserts a behavior claim with no captured measurement and no
-  `inferred from schema` marker.
+- Violates the verification contract (above): names a non-existent
+  identifier (e.g. joins `spatialrss.authors` when the real table is
+  `mstuserinformation_new` — the worst failure mode, surviving to
+  consumer-query time as silent errors), asserts a JOIN without an
+  `[inferred]` marker, or makes a behavior claim with neither a captured
+  measurement nor an `inferred from schema` marker.
 - Reads as a SQL recipe book — "for question X, write query Y" — rather
   than a knowledge base the analyst reasons over.
 - Is indistinguishable from a prior cluster's artifact.
@@ -462,8 +443,9 @@ A bad artifact:
 
 Write files to a folder named `<cluster>-analyst/` in a location the user
 has write access to. Ask in phase 2 if unsure (default: prompt the user).
-The user is expected to zip or copy the folder and upload it to claude.ai
-as a new Skill via the Settings → Capabilities UI.
+The user is expected to zip or copy the folder and install it as a new
+Skill — in claude.ai via Settings → Capabilities, or by placing it in
+their agent's skills directory (e.g. Claude Code / Codex).
 
 ## When you're done
 
@@ -471,8 +453,8 @@ End with a short summary:
 
 ```
 Wrote <cluster>-analyst/ (6 files, <N> words total). To save as a
-Skill: compress the folder and upload via claude.ai Settings →
-Capabilities → Add Skill.
+Skill: compress the folder and add it to your agent — claude.ai
+Settings → Capabilities → Add Skill, or your skills directory.
 ```
 
 If the user already had a matching analyst Skill loaded, add:
@@ -487,7 +469,7 @@ This artifact is a full replacement for the previously loaded
 Load these on demand. Do not load all at once.
 
 - **`pipeline.md`** (in this Skill) — full SQL recipes for each of the
-  10 phases. Load at phase start. ~9-11k words.
+  all phases (0–8). Load at phase start. ~9-11k words.
 - **`templates.md`** (in this Skill) — section templates for each of the
   6 output files. Load at phase 8. ~10-12k words.
 - **`edge-cases.md`** (in this Skill) — gotcha library (~27 known edge

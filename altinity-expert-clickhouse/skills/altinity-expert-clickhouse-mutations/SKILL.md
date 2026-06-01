@@ -1,6 +1,7 @@
 ---
 name: altinity-expert-clickhouse-mutations
 description: Track and diagnose ClickHouse ALTER UPDATE, ALTER DELETE, and other mutation operations. Use for stuck mutations and mutation performance issues.
+license: Apache-2.0
 ---
 
 # Mutation Tracking and Analysis
@@ -11,7 +12,7 @@ Track and diagnose ALTER UPDATE, ALTER DELETE, and other mutation operations.
 
 ## Diagnostics
 
-Run all queries from the file checks.sql and analyze the results.
+Run all queries from `checks.sql` in this skill's directory and analyze the results.
 
 ---
 
