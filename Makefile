@@ -1,7 +1,9 @@
-# Skills Build System
-# Creates zip files for all skill directories (directories containing SKILL.md)
+# Skills Build System (LOCAL builds only)
+# Creates zip files for all skill directories (directories containing SKILL.md).
+# Output lands in releases/, which is gitignored. CI does NOT use this Makefile:
+# the GitHub workflows build their own zips into dist/ and publish via Releases.
 
-SKILLS_DIR := $(shell pwd)
+SKILLS_DIR := $(CURDIR)
 BUILD_DIR := $(SKILLS_DIR)/releases
 SKILL_DIRS := $(shell \
     find altinity-expert-clickhouse/skills -maxdepth 2 -name "SKILL.md" ! -path "*/.system/*" -exec dirname {} \; | sort; \
@@ -17,9 +19,10 @@ $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
 
 define ZIP_template
-$(BUILD_DIR)/$(notdir $(1)).zip: $(1)/SKILL.md
+$(BUILD_DIR)/$(notdir $(1)).zip: $(shell find $(1) -type f) | $(BUILD_DIR)
 	@echo "Packaging $(notdir $(1))..."
-	@cd $(1) && zip -r $(BUILD_DIR)/$(notdir $(1)).zip . -x "*.DS_Store" -x "*__MACOSX*" -x "*.git*" -x "*__pycache__*" -x "*.pyc"
+	@rm -f $(BUILD_DIR)/$(notdir $(1)).zip
+	@cd $(1) && zip -rq $(BUILD_DIR)/$(notdir $(1)).zip . -x "*.DS_Store" -x "*__MACOSX*" -x "*.git*" -x "*__pycache__*" -x "*.pyc"
 endef
 
 $(foreach dir,$(SKILL_DIRS),$(eval $(call ZIP_template,$(dir))))
