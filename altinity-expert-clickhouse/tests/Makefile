@@ -5,7 +5,7 @@
 	test-memory test-memory-codex test-memory-claude test-memory-gemini \
 	test-overview test-reporting test-ingestion test-merges test-mutations \
 	test-storage test-caches test-dictionaries test-logs \
-	test-metrics test-replication test-schema \
+	test-metrics test-replication test-schema test-security \
 	up down reset validate setup clean lint help
 
 RUNNER := ./runner/run-test.sh
@@ -60,7 +60,7 @@ test: test-all
 
 test-all: validate test-memory test-overview test-reporting test-ingestion test-merges test-mutations \
 	test-storage test-caches test-dictionaries test-logs test-metrics test-replication \
-	test-schema
+	test-schema test-security
 
 # Run all skill tests with explicit LLM provider
 test-all-codex:
@@ -124,6 +124,9 @@ test-replication: validate
 test-schema: validate
 	LLM_PROVIDER=$(LLM_PROVIDER) CODEX_MODEL=$(CODEX_MODEL) CODEX_VERIFY_MODEL=$(CODEX_VERIFY_MODEL) $(RUNNER) $(RUNNER_FLAGS) altinity-expert-clickhouse-schema
 
+test-security: validate
+	LLM_PROVIDER=$(LLM_PROVIDER) CODEX_MODEL=$(CODEX_MODEL) CODEX_VERIFY_MODEL=$(CODEX_VERIFY_MODEL) $(RUNNER) $(RUNNER_FLAGS) altinity-expert-clickhouse-security
+
 # Run memory skill test without verification
 test-memory-no-verify: validate
 	LLM_PROVIDER=$(LLM_PROVIDER) CODEX_MODEL=$(CODEX_MODEL) $(RUNNER) --skip-verify $(RUNNER_FLAGS) altinity-expert-clickhouse-memory
@@ -181,6 +184,7 @@ help:
 	@echo "  make test-metrics      Run metrics skill test"
 	@echo "  make test-replication  Run replication skill test"
 	@echo "  make test-schema       Run schema skill test"
+	@echo "  make test-security     Run security skill test"
 	@echo "  make test-memory-codex Run memory skill test with Codex"
 	@echo "  make test-memory-claude Run memory skill test with Claude"
 	@echo "  make test-memory-gemini Run memory skill test with Gemini (stub)"
