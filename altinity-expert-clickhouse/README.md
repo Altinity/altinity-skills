@@ -4,7 +4,7 @@ This package contains the modular `altinity-expert-clickhouse-*` ClickHouse diag
 
 ## Layout
 
-- `skills/` — all `altinity-expert-clickhouse-*` skill definitions (each has its own `SKILL.md`). The `...-overview` skill is the router and suggests which specialist skill(s) to run next.
+- `skills/` — all `altinity-expert-clickhouse-*` skill definitions (each has its own `SKILL.md`). The `...-overview` skill is the router and suggests which specialist skill(s) to run next. The `...-security` skill is a standalone, read-only security audit (it uses a `references/` subdirectory loaded on demand) and is not part of the performance-triage chain below.
 - `tests/` — test suite and scenarios. Do not modify structure without updating prompts/runner.
 - `../releases/` — built zip packages for distribution.
 
@@ -39,6 +39,20 @@ Report requirements:
 - Make sure the report clearly states the timeframe used for logs (last 24h unless otherwise specified).
 ```
 
+
+## Security Audit (standalone)
+
+The `altinity-expert-clickhouse-security` skill performs a professional, read-only
+security audit (users, roles, grants, definer views, row policies, external sources,
+audit logs, secrets, Keeper/interserver, encryption/backups, HTTP surface, cluster,
+and version-specific behavior). Example prompt:
+
+```
+Perform a read-only ClickHouse security audit using the altinity-expert-clickhouse-security skill.
+Produce findings with severity, confidence, evidence (redacted), and SQL-only limitations.
+```
+
+Run its test with `make test-security` (see below).
 
 ## Run Tests
 
