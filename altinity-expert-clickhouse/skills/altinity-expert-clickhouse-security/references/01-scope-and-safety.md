@@ -8,7 +8,7 @@ Use this section first for any live-system audit.
 - Do not run `CREATE`, `ALTER`, `DROP`, `TRUNCATE`, `INSERT`, `OPTIMIZE`, `SYSTEM`, `KILL`, `BACKUP`, `RESTORE`, or `SET` unless the user explicitly asks for a remediation command and understands it is not an audit probe.
 - Do not run network probes through table functions.
 - Do not use table functions to test whether exfiltration is possible.
-- Do not attempt online password guessing or authentication attempts.
+- Do not guess passwords or iterate credentials/usernames online. A *single* connection attempt as one specific, named account — e.g. confirming whether a `no_password` user actually logs in — is allowed **only with explicit owner authorization**; that is verification, not guessing. Never loop over passwords or user lists. See `04`.
 - Do not print secrets, password hashes, salts, or credential candidates.
 
 ## Initial evidence checklist

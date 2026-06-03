@@ -35,6 +35,8 @@ Do not flag broad private ranges automatically for cluster/service users; correl
 
 If a finding cannot state the principal's host restriction, that is a gap to report, not an omission to ignore.
 
+With explicit owner authorization, a single connection attempt resolves the `::/0` reachability question SQL cannot answer: any ClickHouse auth response (even a rejection) proves the port is reachable from that position, whereas a dropped/closed TLS connection (`SSL connection unexpectedly closed`) or timeout means the port is not exposed there (perimeter-gated). Field example: identical `::/0` `no_password` accounts were a live public hole on one cluster (native port answered) and inert on another (native port refused the TLS connection, fronted by an OAuth/nginx perimeter). Interpreting the auth response itself is covered in `04`.
+
 ## Check: ports, listeners, and TLS — config-only
 
 Listener and port configuration is **not** exposed in `system.server_settings`. On current versions (verified on 25.8) that table does **not** contain `listen_host`, `tcp_port`, `tcp_port_secure`, `http_port`, `https_port`, `mysql_port`, `postgresql_port`, `grpc_port`, or `interserver_http(s)_port`. So:
