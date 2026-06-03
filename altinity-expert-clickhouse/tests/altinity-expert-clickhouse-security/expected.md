@@ -24,7 +24,7 @@ These strengthen the report but are not strictly required:
 
 - [ ] **Weak/known password**: `sec_weak_sha` uses a known-weak password (`qwerty`) — ideally detected via safe offline denylist reasoning, without printing the password.
 
-- [ ] **Missing expiration / broad host**: Human-like users have no `valid_until` and broad host access (`HOST ANY`).
+- [ ] **Missing expiration / broad host**: Human-like users have no expiration (`VALID UNTIL`) and broad host access (`HOST ANY`).
 
 - [ ] **Multiple auth methods weakest-link**: `sec_multi_auth` pairs a strong bcrypt method with a plaintext fallback (if the version supports multiple auth methods).
 

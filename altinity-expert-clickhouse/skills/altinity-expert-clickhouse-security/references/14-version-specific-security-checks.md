@@ -10,6 +10,8 @@ SELECT version();
 
 Use exact version in findings. If mixed-version cluster is possible, collect per replica when a cluster name is provided.
 
+The `access_control_improvements` flags below (`select_from_system_db_requires_grant`, `select_from_information_schema_requires_grant`, `on_cluster_queries_require_cluster_grant`, `table_engines_require_grant`, `enable_read_write_grants`, …) are the same ones the `altinity-expert-clickhouse-grants` skill checks from the remediation side after upgrades — keep the two lists in sync.
+
 ## 24.2 and newer: view security
 
 ClickHouse 24.2 added `DEFINER` and `SQL SECURITY` support for views/materialized views. For older versions, view security behavior and materialized view permission semantics may differ.

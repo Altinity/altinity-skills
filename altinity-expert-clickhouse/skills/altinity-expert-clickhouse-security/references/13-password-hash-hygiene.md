@@ -17,7 +17,6 @@ Use `system.users` first:
 SELECT
     name,
     auth_type,
-    valid_until,
     host_ip,
     host_names,
     host_names_regexp

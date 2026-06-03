@@ -8,7 +8,6 @@ Use this section to evaluate ClickHouse user authentication posture. Do not trea
 SELECT
     name,
     auth_type,
-    valid_until,
     host_ip,
     host_names,
     host_names_regexp,
@@ -19,6 +18,8 @@ SELECT
 FROM system.users
 ORDER BY name;
 ```
+
+`system.users` has no `valid_until` column on current versions (expiration became per-auth-method). Read expiration from `SHOW CREATE USER <name>` / `SHOW ACCESS` (the `VALID UNTIL` clause), not from `system.users`.
 
 Classify:
 
@@ -45,7 +46,7 @@ Do not recommend deleting or disabling `default` blindly. First confirm internod
 
 ## Check: credential expiration
 
-Use `valid_until` from `system.users`.
+Expiration is the `VALID UNTIL` clause shown by `SHOW CREATE USER <name>` / `SHOW ACCESS` (not a `system.users` column on current versions). Look for it there.
 
 Risk signals:
 

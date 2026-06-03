@@ -17,22 +17,20 @@ SELECT
     host_address,
     port,
     is_local,
-    user,
-    secure
+    user
 FROM system.clusters
 ORDER BY cluster, shard_num, replica_num;
 ```
 
 Redact internal hostnames if needed.
 
-The `secure` column of `system.clusters` is present on 24.x/25.x (it has existed for many releases) and is the SQL-visible signal for interserver transport: `secure = 0` on a shard/replica means that distributed connection is plaintext. Read it — do not report it as "absent in this build" or defer interserver-transport findings to config when the column is right there. (`secure` reflects the cluster definition; whether the port itself is TLS-enforced is confirmed separately, see `16-keeper-and-interserver-security.md`.)
+`system.clusters` does **not** expose a `secure` column on current versions (24.x/25.x) — do not query it and do not infer interserver TLS from this table. Interserver transport security is the `<secure>` flag in the `remote_servers` config plus `interserver_https_port`; confirm it from `config.xml` (see `16-keeper-and-interserver-security.md`). If a report says "the `secure` column is absent in this build," that is correct, not an oversight.
 
 Risk signals:
 
-- plaintext cluster connections where secure transport is expected (`secure = 0`).
-- shared high-privilege user for distributed access.
+- shared high-privilege user for distributed access (the `user` column).
 - cluster credentials visible to too many users through `system.clusters`.
-- inconsistent `secure` flags.
+- plaintext interserver transport — confirmed from config (`16`), not from this table.
 
 ## Check: distributed DDL exposure
 

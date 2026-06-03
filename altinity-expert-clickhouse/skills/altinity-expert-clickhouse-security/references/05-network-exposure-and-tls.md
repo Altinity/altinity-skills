@@ -35,34 +35,21 @@ Do not flag broad private ranges automatically for cluster/service users; correl
 
 If a finding cannot state the principal's host restriction, that is a gap to report, not an omission to ignore.
 
-## Check: server settings visible from SQL
+## Check: ports, listeners, and TLS — config-only
+
+Listener and port configuration is **not** exposed in `system.server_settings`. On current versions (verified on 25.8) that table does **not** contain `listen_host`, `tcp_port`, `tcp_port_secure`, `http_port`, `https_port`, `mysql_port`, `postgresql_port`, `grpc_port`, or `interserver_http(s)_port`. So:
+
+- Do not rate TLS/port exposure from SQL, and do not treat "ports not visible in `system.server_settings`" as an oversight — it is the expected state. A report that says ports/TLS/`listen_host` are not SQL-verifiable is correct.
+- Confirm `tcp_port_secure`, `https_port`, plaintext-port exposure, `listen_host`, and `openSSL` from `config.xml` / `config.d` (request them).
+- The one security-relevant server setting that *is* in `system.server_settings` is `display_secrets_in_show_and_select` (see `09` and `12`):
 
 ```sql
-SELECT
-    name,
-    value,
-    changed
+SELECT name, value, changed
 FROM system.server_settings
-WHERE name IN
-(
-    'listen_host',
-    'tcp_port',
-    'tcp_port_secure',
-    'http_port',
-    'https_port',
-    'mysql_port',
-    'postgresql_port',
-    'grpc_port',
-    'prometheus.port',
-    'interserver_http_port',
-    'interserver_https_port'
-)
-ORDER BY name;
+WHERE name = 'display_secrets_in_show_and_select';
 ```
 
-On modern builds (24.x and 25.x) these port settings — including `tcp_port_secure` and `https_port` — **are** present in `system.server_settings`; run the query and read the values. Only defer TLS/port findings to `config.xml` if the query genuinely returns nothing for them. "Not present in `system.server_settings` on this build" is almost always a sign the query was not run, not that the build lacks the rows — do not claim TLS/ports are unverifiable on a current version without first querying. (On older 23.x builds some rows, e.g. `listen_host`, may be absent — then request `config.xml` / `config.d`.)
-
-Also consider the gRPC port (`grpc_port`) and any Prometheus metrics endpoint as additional exposed surfaces: an open `grpc_port` is another authenticated entry point, and an unauthenticated Prometheus endpoint can leak metric and label data. The HTTP interface (handlers, Play UI, CORS) is covered in `19-http-interface-surface.md`; interserver authentication is covered in `16-keeper-and-interserver-security.md`.
+The gRPC port and any Prometheus metrics endpoint are additional exposed surfaces (also config-only). The HTTP interface (handlers, Play UI, CORS) is covered in `19-http-interface-surface.md`; interserver authentication in `16-keeper-and-interserver-security.md`.
 
 ## TLS posture
 

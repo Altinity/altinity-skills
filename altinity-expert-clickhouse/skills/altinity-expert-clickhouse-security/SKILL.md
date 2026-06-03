@@ -18,7 +18,7 @@ Use this skill to perform a professional, read-only ClickHouse security audit. T
 - Correlate findings. Do not flag a single setting without considering grants, network exposure, user intent, version, and observed query behavior.
 - State what could not be verified from SQL-only access.
 - Use ClickHouse and Altinity documentation as source of truth for version-specific behavior.
-- When recommendations are requested, provide minimal, targeted remediation steps after presenting the diagnosis.
+- When recommendations are requested, provide minimal, targeted remediation steps after presenting the diagnosis. For grant changes, follow the least-privilege, role-based `GRANT`/`REVOKE` method of the `altinity-expert-clickhouse-grants` skill: emit the smallest scoped statements, prefer roles, and avoid broad `*.*` grants.
 
 ## Standard workflow
 
@@ -26,13 +26,10 @@ Use this skill to perform a professional, read-only ClickHouse security audit. T
    - live SQL access, exported `system.*` data, supplied `users.xml` / `config.xml`, or query-log extracts.
    - single node or cluster.
    - ClickHouse version and deployment model.
-2. Collect safe evidence:
-   - `SELECT version()`
-   - `SHOW ACCESS`
-   - selected `system.*` tables
-   - supplied configuration snippets
+2. Collect safe evidence. For a fast first pass, run the read-only inventory in `checks.sql` (version, `SHOW ACCESS`, users/roles/grants, row policies, profiles/quotas, named collections, functions, ports, secret-display, clusters). Then add, as needed:
+   - supplied `users.xml` / `config.xml` snippets
    - recent `system.query_log` and `system.session_log`, if available.
-3. Load only the relevant reference files below.
+3. Load only the relevant reference files below for depth on each area.
 4. Produce findings with:
    - title
    - severity
@@ -64,6 +61,10 @@ Use this skill to perform a professional, read-only ClickHouse security audit. T
 - `references/18-encryption-at-rest-and-backups.md`: encrypted disks, storage credentials, `BACKUP`/`RESTORE` destinations.
 - `references/19-http-interface-surface.md`: HTTP handlers, Play UI, CORS, default-credential access over HTTP.
 - `references/20-reporting-severity-and-output-format.md`: severity rubric and final report structure.
+
+## Related skills
+
+This skill is the proactive, read-only **audit** half of access management — it finds *excess* access and risk, and never grants anything. Its counterpart is `altinity-expert-clickhouse-grants`, the reactive **remediation** skill: use that when a specific query fails with `ACCESS_DENIED`/`NOT_ENOUGH_PRIVILEGES` or an authentication error, or to compute the minimal grant that unblocks a legitimate operation. Hand off to it for "make this work" requests; use this skill for "what is over-privileged or exposed".
 
 ## SQL style
 
