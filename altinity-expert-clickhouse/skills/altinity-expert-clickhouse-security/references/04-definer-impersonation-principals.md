@@ -4,13 +4,17 @@ Use this section for `SQL SECURITY DEFINER`, `EXECUTE AS`, `IMPERSONATE`, and no
 
 ## Key model
 
-`no_password` (and `no_authentication`) means **passwordless authentication is permitted** — it is not "no access" and not a disabled account. It is also not automatically a finding. In practice such an account is almost always one of three things, and severity comes from *which*, never from `auth_type = no_password` or `host_ip = ::/0` alone:
+`no_password` (and `no_authentication`) means ClickHouse accepts that user over the **native and HTTP protocols with no credential at all** — it is a real login path, not "no access" and not a disabled account. An OAuth/JWT/SSO proxy in front of ClickHouse does **not** gate this: if the native (9440/9000) or HTTP port is reachable from a source the host ACL admits, the passwordless login succeeds directly and bypasses the proxy. Names and roles are not authentication — do **not** assume a `user@domain` identity or `oauth_*` role membership makes it safe.
 
-- **Security principal** — the identity a `SQL SECURITY DEFINER` view / materialized view runs as, or an `IMPERSONATE` target. It is never the connecting user; its grants exist to back those views/targets.
-- **Externally-authenticated identity** — in OAuth/JWT/SSO or proxy-fronted deployments (e.g. Altinity Cloud), `no_password` in `system.users` is a placeholder for auth delegated to the proxy/SSO. Signals: identities like `user@domain`, OAuth/SSO-derived role names. The `::/0` host ACL is gated by the perimeter, not by ClickHouse.
-- **A genuine passwordless login hole** — an account anyone can authenticate as with no credential from any allowed host. This is the only case that is a finding on its own.
+> Field-verified on an Altinity demo server: a `no_password` user named like an OAuth identity, `host_ip = ::/0`, logged in from the public internet with an empty password and held a writer role. The OAuth front-end did not protect the native port.
 
-Do not headline "no-password users" as the finding, and do not treat broad host + grants as sufficient — that describes a normal definer/OAuth principal too.
+So a no_password account is a **live anonymous-login hole** whenever its host ACL admits a reachable source — *unless* you can affirmatively show it is a non-login principal. Treat it as a principal only with evidence:
+
+- it is referenced **only** as a `SQL SECURITY DEFINER` / `IMPERSONATE` target, and/or
+- `system.session_log` shows **zero** `LoginSuccess` for it, and/or
+- its host ACL excludes reachable sources (localhost / operator subnet only — `::/0` does not).
+
+Verify, do not infer — the burden of proof is on "safe", not on "vulnerable".
 
 ## Check: no-password principals
 
@@ -47,12 +51,12 @@ ORDER BY logins DESC;
 
 Zero `LoginSuccess` events → it is not used as a login identity; treat it as a principal regardless of the host ACL. (If `session_log` is absent/empty, say so and fall back to the definer/delegated-auth determination.)
 
-- **Is auth delegated?** `user@domain` / SSO role names + a proxy-fronted deployment mean the `::/0` is gated by the perimeter (see `05`), not a passwordless hole.
+- **Confirm reachability — do not assume a proxy gates it.** An OAuth/SSO front-end does not close the native/HTTP port. `::/0` is safe only if the network perimeter actually blocks the port, which is not SQL-verifiable (see `05`); assume reachable until proven otherwise. With authorization, an actual passwordless connection attempt is the definitive test.
 
 Rate:
 
-- **Info / OK** — a definer or impersonation principal, an externally-authenticated/OAuth identity, or any no-password account with no observed direct logins. Broad host and write/`SOURCES` grants matched to its definer/impersonation purpose are expected here, not a finding.
-- **Finding (gate severity on reachability, `05`)** — only when the account is a *direct login identity* (observed or plausible `LoginSuccess`), reachable, and carries grants beyond what a principal role needs. The risk to state is "anyone can connect as this account with no credential" — not the word `no_password`.
+- **High by default — Critical if admin-equivalent (gate on reachability, `05`)** — a no_password account whose host ACL admits reachable sources (`::/0` or broad) and that holds meaningful grants. Anyone who reaches the port connects as it with no credential. Default `::/0` to reachable unless the perimeter is proven closed; the OAuth/proxy layer does not close it.
+- **Info / OK** — only when verified as a non-login principal: a definer/impersonation target with zero `LoginSuccess`, or a host ACL restricted to non-reachable sources. Grants matched to that definer/impersonation purpose are expected.
 
 ## Check: views using definer security
 
