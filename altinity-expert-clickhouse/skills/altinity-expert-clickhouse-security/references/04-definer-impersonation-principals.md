@@ -58,20 +58,6 @@ Rate:
 - **High by default — Critical if admin-equivalent (gate on reachability, `05`)** — a no_password account whose host ACL admits reachable sources (`::/0` or broad) and that holds meaningful grants. Anyone who reaches the port connects as it with no credential. Default `::/0` to reachable unless the perimeter is proven closed; the OAuth/proxy layer does not close it.
 - **Info / OK** — only when verified as a non-login principal: a definer/impersonation target with zero `LoginSuccess`, or a host ACL restricted to non-reachable sources. Grants matched to that definer/impersonation purpose are expected.
 
-## Confirm exploitability (authorized only)
-
-The definitive test of a `no_password` hole is a single passwordless connection as that exact account, from the relevant network position — **only with explicit owner authorization** (`01`). It is verification, not guessing: one named account, no password/user iteration. Read the response:
-
-- **Auth rejected** — `AUTHENTICATION_FAILED` / `Code 516 (... password is incorrect, or there is no user with such name)` → not exploitable as no_password (has a credential, or is gated/absent).
-- **Auth passed** — login succeeds, **or** a *post-authentication* error such as `Code 81: Database ... does not exist` (a missing `default_database`) → the credentials were accepted: this is a **live passwordless login**. Do not mistake a post-auth error for a failed login.
-- **No ClickHouse response** — connection dropped, `SSL connection unexpectedly closed`, or timeout → the port is not reachable from that position (perimeter-gated); the `::/0` ACL is not exploitable from there (`05`).
-
-## Remediation for a no_password login hole
-
-- **Definer/impersonation principal:** set a strong password (or restrict `host_ip` off `::/0`). The `SQL SECURITY DEFINER` mechanism uses the principal's grants, not a live login — the views keep working — so prefer this over dropping when objects depend on it.
-- **Before dropping or altering**, confirm the account is not your own session identity or a management/automation login (operator, MCP, BI service). Removing it can lock you or those tools out — verified the hard way.
-- **Operator-managed (Kubernetes/CHI) deployments:** apply the fix in the CHI users config, not just SQL — the operator may revert SQL-only user changes on its next reconciliation.
-
 ## Check: views using definer security
 
 ```sql
