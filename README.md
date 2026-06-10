@@ -1,10 +1,28 @@
-# Skills
+<div align=center>
 
-This repository contains skills used for ClickHouse DB performance and schema analysis and helper workflows.
+<a href="https://altinity.com/slack">
+  <img src="https://img.shields.io/static/v1?logo=slack&logoColor=959DA5&label=Slack&labelColor=333a41&message=join%20conversation&color=3AC358" alt="AltinityDB Slack" />
+</a>
+
+<picture align=center>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo_horizontal_blue_white.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/logo_horizontal_blue_black.png">
+    <img alt="Altinity company logo" src="docs/images/logo_horizontal_blue_black.png">
+</picture>
+
+</div>
+
+# Altinity Skills
+
+This repository contains skills used for ClickHouse® DB performance and schema analysis and helper workflows.
 
 ## Core Skills
 - `altinity-expert-clickhouse/`: Modular ClickHouse diagnostic skill set. Each module is a standalone skill under `altinity-expert-clickhouse/skills/` (e.g., memory, merges, replication).
 - `altinity-profiler-clickhouse/`: Profiles a live ClickHouse cluster via MCP and generates a per-cluster analyst Skill (schema map, query patterns, engine idioms) that can be saved in claude.ai.
+
+## Conventions
+- Each skill lives in its own directory and includes a `SKILL.md`.
+- Supporting content is stored next to `SKILL.md` (e.g., `modules/`, scripts, prompts).
 
 ## Packaging and Releases
 
@@ -319,11 +337,22 @@ export EXPERT_RUNTIME=codex
 k8s/scripts/run-expert-job.sh demo prod 'my-clickhouse-password'
 ```
 
-## Experimental Skills
-- `experimental/codex-summarize-pipeline/`: Chunk→reduce pipeline for summarizing large articles/files into `summaries/*.md`.
-- `experimental/github-triage/`: Search and summarize relevant GitHub issues/PRs using `gh`.
-- `experimental/sub-agent/`: Prototype sub-agent workflow (multi-agent attempt by exec of next codex/claude inside skill processing).
+## Community Support
 
-## Conventions
-- Each skill lives in its own directory and includes a `SKILL.md`.
-- Supporting content is stored next to `SKILL.md` (e.g., `modules/`, scripts, prompts).
+* Join the [AltinityDB Slack Workspace](https://altinity.com/slack) to ask questions. 
+* [Log an issue on this project](https://github.com/Altinity/altinity-skills/issues).
+
+## Commercial Support
+
+Altinity offers a range of services related to ClickHouse®. 
+
+- [Official website](https://altinity.com/) - Get a high level overview of Altinity and our offerings.
+- [Altinity.Cloud](https://altinity.com/cloud-database/) - Run any ClickHouse® in your cloud or ours. 
+- [Altinity Support](https://altinity.com/support/) - Get Enterprise-class support for ClickHouse®.
+- [Slack](https://altinity.com/slack) - Talk directly with ClickHouse® users and Altinity devs.
+- [Contact us](https://hubs.la/Q020sH3Z0) - Contact Altinity with your questions or issues.
+- [Free consultation](https://hubs.la/Q020sHkv0) - Get a free consultation with a ClickHouse® expert today.
+
+<hr>
+
+*© 2025-2026 Altinity Inc. All rights reserved. Altinity®, Altinity.Cloud®, and Altinity Stable® are registered trademarks of Altinity, Inc. ClickHouse® is a registered trademark of ClickHouse, Inc.; Altinity is not affiliated with or associated with ClickHouse, Inc.*
