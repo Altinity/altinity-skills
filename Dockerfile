@@ -19,10 +19,11 @@ ENV HOME=/home/bun
 ENV BUN_INSTALL=/opt/bun
 ENV PATH="/opt/bun/bin:${PATH}"
 
-RUN bun install -g @openai/codex@${CODEX_VERSION} \
+RUN echo "toolchain-refresh=${TOOLCHAIN_REFRESH}" \
+  && bun install -g @openai/codex@${CODEX_VERSION} \
   && bun install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \
-  && bunx skills add --global --agent claude-code codex --yes Altinity/Skills/altinity-expert-clickhouse/ \
-  && bunx skills add --global --agent claude-code codex --yes Altinity/Skills/altinity-profiler-clickhouse/ \
+  && bunx skills add --global --agent claude-code codex --yes Altinity/altinity-skills/altinity-expert-clickhouse/ \
+  && bunx skills add --global --agent claude-code codex --yes Altinity/altinity-skills/altinity-profiler-clickhouse/ \
   && codex --version \
   && claude --version \
   && chown -R bun:bun /home/bun /opt/bun
@@ -35,11 +36,10 @@ RUN mkdir -p /etc/claude-code \
     '  "mcpServers": {' \
     '    "clickhouse": {' \
     '      "command": "/bin/altinity-mcp",' \
-    '      "args": ["--config", "/opt/expert-mcp/mcp-config.json", "--read-only", "1"]' \
+    '      "args": ["--config", "/etc/altinity-mcp/config.yaml", "--read-only", "1"]' \
     '    }' \
     '  }' \
     '}' > /etc/claude-code/managed-mcp.json \
-  && chmod 755 /etc/claude-code \
   && chmod 644 /etc/claude-code/managed-mcp.json
 
 USER bun
@@ -52,5 +52,5 @@ web_search = "live"
 
 [mcp_servers.clickhouse]
 command = "/bin/altinity-mcp"
-args = ["--config","/opt/expert-mcp/config.yaml","--read-only", "1"]
+args = ["--config","/etc/altinity-mcp/config.yaml","--read-only", "1"]
 EOF
