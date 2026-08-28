@@ -146,7 +146,7 @@ Cloud node pools, for example:
 
 ```bash
 kubectl get nodes -l node.altinity.cloud/role.clickhouse=true \
-  -o custom-columns=NAME:.metadata.name,ZONE-ID:'{.metadata.labels.topology.k8s.aws/zone-id}'
+  -o custom-columns=NAME:.metadata.name,ZONE-ID:'.metadata.labels.topology\.k8s\.aws/zone-id'
 ```
 
 If that zone has no ClickHouse nodes, adding or placing a replica there is the
