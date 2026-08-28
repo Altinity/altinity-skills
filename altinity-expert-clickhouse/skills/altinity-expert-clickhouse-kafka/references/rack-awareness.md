@@ -236,9 +236,10 @@ even if broker IDs changed. Update `KAFKA_CLIENT_RACK` only when the broker
 rack naming scheme changed or rack awareness is no longer available.
 
 After cutover, verify consumer progress, inspect exceptions and DNS errors,
-and repeat the broker-traffic comparison. A broker URL that differs from the
-usual MSK listener port is not automatically wrong, but it warrants checking
-against the cluster's current bootstrap-broker source of truth.
+and repeat the broker-traffic comparison. Check the configured broker
+endpoints against the cluster's current bootstrap-broker list. A hostname or
+port you do not recognize is not automatically wrong, but it is worth
+confirming before you attribute traffic to it.
 
 ## Practical failure modes
 
