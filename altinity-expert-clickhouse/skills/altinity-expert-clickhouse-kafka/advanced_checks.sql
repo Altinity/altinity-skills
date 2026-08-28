@@ -156,6 +156,8 @@ SELECT
     table,
     broker,
     tupleElement(broker_data, 'state') AS state,
+    tupleElement(broker_data, 'rx') AS received_bytes,
+    tupleElement(broker_data, 'tx') AS transmitted_bytes,
     tupleElement(broker_data, 'txerrs') AS tx_errors,
     tupleElement(broker_data, 'rxerrs') AS rx_errors,
     tupleElement(broker_data, 'connects') AS connects,

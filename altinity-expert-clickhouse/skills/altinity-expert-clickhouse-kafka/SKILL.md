@@ -1,6 +1,6 @@
 ---
 name: altinity-expert-clickhouse-kafka
-description: Diagnose ClickHouse Kafka engine health, consumer status, thread pool capacity, and consumption issues. Use for Kafka lag, consumer errors, and thread starvation.
+description: Diagnose ClickHouse Kafka engine health, consumer status, thread pool capacity, consumption issues, and Kafka rack-awareness problems. Use for Kafka lag, consumer errors, thread starvation, or unexpected cross-AZ Kafka traffic and cost.
 license: Apache-2.0
 ---
 
@@ -67,6 +67,14 @@ For troubleshooting common errors and configuration guidance, see [troubleshooti
 - Offset rewind / replay
 - Parallel consumption tuning
 
+### Rack Awareness and Cross-AZ Kafka Traffic
+
+Load [references/rack-awareness.md](references/rack-awareness.md) when the
+investigation involves AWS MSK, `client.rack`, `KAFKA_CLIENT_RACK`, Kafka
+cross-AZ or cross-region cost, VPC endpoints, or migration to a new Kafka
+cluster. It verifies the actual broker rack IDs, the consumer's physical
+location, and the ClickHouse configuration before recommending a change.
+
 ---
 
 ## Cross-Module Triggers
@@ -77,6 +85,7 @@ For troubleshooting common errors and configuration guidance, see [troubleshooti
 | High merge memory | `altinity-expert-clickhouse-merges` | Merge patterns |
 | Query-level issues | `altinity-expert-clickhouse-reporting` | Query optimization |
 | Schema concerns | `altinity-expert-clickhouse-schema` | Table design |
+| Cross-AZ cost remains after Kafka checks, or traffic uses ClickHouse interserver ports | `altinity-expert-clickhouse-replication` | Separate Kafka fetch traffic from inter-replica traffic |
 
 ---
 
