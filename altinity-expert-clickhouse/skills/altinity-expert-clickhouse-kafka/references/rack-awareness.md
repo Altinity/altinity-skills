@@ -152,8 +152,9 @@ WHERE database = '<db>'
 ```
 
 Enable and inspect `rdkafka_stat` only when a detailed broker-traffic view is
-needed. Its broker statistics can show received and transmitted byte counters
-per ClickHouse host and Kafka broker. Capture two snapshots after rollout and
+needed. Its broker statistics expose per-broker byte counters (`rxbytes` and
+`txbytes`) for each ClickHouse host. Do not use `rx` and `tx` for this: those
+are request and response counts, not bytes. Capture two snapshots after rollout and
 compare the deltas. Correlate broker addresses with their verified rack IDs;
 do not label traffic as local from the broker ID alone.
 
