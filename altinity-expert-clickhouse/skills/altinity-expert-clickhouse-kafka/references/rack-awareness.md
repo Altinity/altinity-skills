@@ -158,27 +158,50 @@ accepted topology tradeoff unless the deployment requirements say otherwise.
 First, confirm that the ClickHouse table is connected to the intended brokers:
 
 ```sql
-SELECT database, name, create_table_query
-FROM system.tables
-WHERE engine LIKE '%Kafka%';
+SELECT
+    hostName() AS host,
+    database,
+    name,
+    engine_full
+FROM clusterAllReplicas('{cluster}', system.tables)
+WHERE engine LIKE '%Kafka%'
+ORDER BY database ASC, name ASC, host ASC
+LIMIT 100
+;
 ```
 
-Then inspect consumers. Advancing offsets with no current exceptions are
-strong evidence that the configured endpoint is reachable.
+Then inspect consumers on every replica. Advancing offsets with no current
+exceptions are strong evidence that the configured endpoint is reachable, and
+per-host output is what shows a single replica behaving differently from the
+rest.
 
 ```sql
-SELECT *
-FROM system.kafka_consumers
+SELECT
+    hostName() AS host,
+    database,
+    `table`,
+    num_messages_read,
+    last_poll_time,
+    last_commit_time,
+    is_currently_used,
+    exceptions.time[-1] AS last_exception_time,
+    left(exceptions.text[-1], 200) AS last_exception_text
+FROM clusterAllReplicas('{cluster}', system.kafka_consumers)
 WHERE database = '<db>'
-  AND table = '<kafka_table>';
+  AND `table` = '<kafka_table>'
+ORDER BY host ASC
+;
 ```
+
+Never `SELECT *` from `system.kafka_consumers`: the `rdkafka_stat` column is a
+large JSON document per consumer.
 
 Enable and inspect `rdkafka_stat` only when a detailed broker-traffic view is
 needed. Its broker statistics expose per-broker byte counters (`rxbytes` and
 `txbytes`) for each ClickHouse host. Do not use `rx` and `tx` for this: those
-are request and response counts, not bytes. Capture two snapshots after rollout and
-compare the deltas. Correlate broker addresses with their verified rack IDs;
-do not label traffic as local from the broker ID alone.
+are request and response counts, not bytes. Capture two snapshots after
+rollout and compare the deltas. Correlate broker addresses with their verified
+rack IDs; do not label traffic as local from the broker ID alone.
 
 Use VPC Flow Logs or AWS Cost and Usage Report data to attribute dollars. A
 VPC endpoint ENI (`vpce-*`) points to endpoint-related Kafka traffic. Pod or
@@ -188,19 +211,11 @@ Do not assume every cross-AZ charge is Kafka traffic. Kafka uses the broker
 listener ports configured for the cluster. ClickHouse interserver traffic uses
 the deployment's interserver port, often `9009`. Investigate replication when
 traffic occurs on ClickHouse ports or when it persists independently of Kafka
-consumer activity:
+consumer activity.
 
-```sql
-SELECT * FROM system.replicas;
-SELECT * FROM system.replication_queue;
-SELECT *
-FROM system.events
-WHERE event LIKE '%Replicat%'
-   OR event LIKE '%Network%';
-```
-
-Use `altinity-expert-clickhouse-replication` for the replication investigation.
-Rack-aware Kafka fetching cannot reduce replica-to-replica transfer.
+Load `altinity-expert-clickhouse-replication` for that investigation rather
+than running replication queries from here. Rack-aware Kafka fetching cannot
+reduce replica-to-replica transfer.
 
 ## Check VPC endpoint routing
 
