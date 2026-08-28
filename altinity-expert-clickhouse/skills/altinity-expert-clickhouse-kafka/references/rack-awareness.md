@@ -135,23 +135,50 @@ If a pod's physical Zone ID differs from `KAFKA_CLIENT_RACK`, the consumer is
 advertising the wrong location. Correct the pod configuration and roll it out
 before assessing traffic distribution.
 
-## Recognize an intentional AZ gap
+## Decide locality per partition
 
-Compare distinct broker racks with the `KAFKA_CLIENT_RACK` values in use. A
-broker rack with no matching ClickHouse replica means traffic for that rack is
-unavoidably cross-AZ. This is not automatically a misconfiguration.
+Comparing the set of broker racks against the set of `KAFKA_CLIENT_RACK`
+values does not tell you whether fetches are local. A broker rack with no
+ClickHouse replica in it costs nothing on its own.
 
-Confirm whether ClickHouse capacity exists in the missing zone. For Altinity
-Cloud node pools, for example:
+What decides locality is each consumed partition's replica placement.
+`RackAwareReplicaSelector` picks the most caught-up replica in the client's
+rack; when that rack holds no replica for the partition, it falls back to the
+leader, which is a cross-AZ fetch. So check the topics ClickHouse consumes:
+
+```bash
+kafka-topics.sh --describe --topic <topic> \
+  --bootstrap-server <broker>:<port> \
+  --command-config /opt/kafka/config/client.properties
+```
+
+Map each partition's `Replicas` and `Isr` broker IDs to the rack strings from
+the previous step. A partition can be served locally when it has a replica in
+the consumer's rack and that replica is in the ISR.
+
+Two common shapes:
+
+- Replication factor 3 across 3 racks: every partition has a replica in every
+  rack, so consumers in any two racks fetch locally. The third rack having no
+  ClickHouse replica costs nothing.
+- Replication factor 2 across 3 racks: some partitions have no replica in a
+  given rack. Consumers there fetch from the leader for those partitions
+  whatever `KAFKA_CLIENT_RACK` says.
+
+Only a partition with no local replica is a real gap. Two fixes exist: place a
+ClickHouse replica in a rack that does hold replicas, or raise the topic's
+replication factor on the Kafka side.
+
+Before recommending either, confirm whether ClickHouse capacity exists in the
+zone at all. For Altinity Cloud node pools, for example:
 
 ```bash
 kubectl get nodes -l node.altinity.cloud/role.clickhouse=true \
   -o custom-columns=NAME:.metadata.name,ZONE-ID:'.metadata.labels.topology\.k8s\.aws/zone-id'
 ```
 
-If that zone has no ClickHouse nodes, adding or placing a replica there is the
-only client-side topology change that can remove the gap. Treat the cost as an
-accepted topology tradeoff unless the deployment requirements say otherwise.
+Treat the remaining cost as an accepted topology tradeoff unless the
+deployment requirements say otherwise.
 
 ## Confirm Kafka traffic and separate other costs
 
@@ -250,7 +277,8 @@ confirming before you attribute traffic to it.
   fetching was skipped.
 - A correct rack value cannot compensate for a VPC endpoint that routes through
   another AZ.
-- A gap between broker racks and ClickHouse racks may be intentional. Confirm
-  compute placement before calling it a configuration defect.
+- A broker rack with no ClickHouse replica is not itself a gap. Check whether
+  the consumed partitions have a local replica before calling it a defect or
+  recommending capacity in that zone.
 - Check all ClickHouse pods in the namespace. An older or separate installation
   can make the traffic picture look inconsistent.
