@@ -67,13 +67,19 @@ For troubleshooting common errors and configuration guidance, see [troubleshooti
 - Offset rewind / replay
 - Parallel consumption tuning
 
-### Rack Awareness and Cross-AZ Kafka Traffic
+---
+
+## Rack Awareness and Cross-AZ Kafka Traffic
 
 Load [references/rack-awareness.md](references/rack-awareness.md) when the
 investigation involves AWS MSK, `client.rack`, `KAFKA_CLIENT_RACK`, Kafka
 cross-AZ or cross-region cost, VPC endpoints, or migration to a new Kafka
-cluster. It verifies the actual broker rack IDs, the consumer's physical
-location, and the ClickHouse configuration before recommending a change.
+cluster. It checks the broker-side replica selector, the real broker rack IDs,
+the consumer's physical location, and the ClickHouse configuration before
+recommending a change.
+
+`client.rack` on its own changes nothing: the brokers must run
+`RackAwareReplicaSelector`, which is not the default. Verify that first.
 
 ---
 
