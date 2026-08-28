@@ -7,10 +7,9 @@ part of the incident.
 
 ## What `client.rack` changes
 
-`client.rack` lets a Kafka consumer prefer a follower in the same rack when
-the broker cluster supports follower fetching. It affects consumer fetch
-routing only. It does not make producer traffic, metadata requests, leader
-traffic, or every control-plane request local.
+`client.rack` lets a Kafka consumer prefer a follower in the same rack. It
+affects consumer fetch routing only. It does not make producer traffic,
+metadata requests, leader traffic, or every control-plane request local.
 
 Kafka matches the consumer rack and broker rack as exact strings. Match the
 broker's reported rack value, not its broker ID. A consumer in `euc1-az2` must
@@ -20,6 +19,29 @@ On AWS, use an Availability Zone ID such as `euc1-az2` when the broker rack
 configuration uses Zone IDs. Do not derive a rack from an AZ letter suffix
 such as `eu-central-1b`: AWS can map those names to different physical zones
 in different accounts.
+
+## Check the broker side first
+
+`client.rack` does nothing on its own. The brokers must select replicas by
+rack, and by default they do not: `replica.selector.class` defaults to
+`LeaderSelector`, which always returns the partition leader no matter what
+rack the consumer advertises. Follower fetching also needs Kafka 2.4 or later
+on both sides (KIP-392).
+
+Confirm the broker setting before changing anything in ClickHouse:
+
+```bash
+kafka-configs.sh --broker <id> --all --describe \
+  --bootstrap-server <broker>:<port> \
+  --command-config /opt/kafka/config/client.properties \
+  | grep replica.selector.class
+```
+
+The value must be `org.apache.kafka.common.replica.RackAwareReplicaSelector`.
+On MSK it is set through a cluster configuration, not per broker, so a change
+requires applying a new MSK configuration revision. If the selector is absent
+or set to the default, stop here: a correct `KAFKA_CLIENT_RACK` cannot reduce
+cross-AZ traffic until the brokers select by rack.
 
 ## Configure ClickHouse once per pod
 
@@ -205,6 +227,9 @@ against the cluster's current bootstrap-broker source of truth.
 
 ## Practical failure modes
 
+- The brokers still use the default `LeaderSelector`. Every consumer fetch
+  goes to the leader and `client.rack` is ignored. This is the most common
+  reason a correct client rack changes nothing.
 - An exact-string mismatch fails silently; Kafka does not warn that rack-aware
   fetching was skipped.
 - A correct rack value cannot compensate for a VPC endpoint that routes through
