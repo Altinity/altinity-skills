@@ -84,26 +84,26 @@ the ClickHouse container.
 
 Follow this order. Do not infer the broker rack from its hostname or ID.
 
-1. List broker rack strings with a Kafka client that can reach the cluster.
-   The exact command depends on authentication, but either Java Kafka tooling
-   or `kcat` can expose broker metadata.
+1. Read the rack string from each broker's own configuration. Repeat per
+   broker ID; `broker.rack` is a per-broker value.
 
    ```bash
-   kafka-broker-api-versions.sh \
+   kafka-configs.sh --broker <id> --all --describe \
      --bootstrap-server <broker>:<port> \
-     --command-config /opt/kafka/config/client-sasl.properties \
-     --list-brokers | grep rack
+     --command-config /opt/kafka/config/client.properties \
+     | grep broker.rack
    ```
 
-   ```bash
-   kcat -L -b <broker>:<port> \
-     -X security.protocol=SASL_SSL \
-     -X sasl.mechanism=SCRAM-SHA-512
-   ```
+   Supply the required TLS or SASL options for the target cluster in the
+   command-config file. Java tools may use a JAAS file. ClickHouse
+   Kafka-engine tables use their own table settings, not that JAAS file.
 
-   Supply the required TLS or SASL options for the target cluster. Java tools
-   may use a JAAS file. ClickHouse Kafka-engine tables use their own table
-   settings, not that JAAS file.
+   On MSK, `aws kafka list-nodes --cluster-arn <arn>` gives the same picture
+   from the AWS API when Kafka tooling is not reachable. MSK sets
+   `broker.rack` to the Availability Zone ID, such as `use1-az4`.
+
+   Do not read racks from `kafka-broker-api-versions.sh` or `kcat -L`. Neither
+   reports `broker.rack`; both list broker IDs and endpoints only.
 
 2. Confirm that every `KAFKA_CLIENT_RACK` string matches a broker rack string.
    A mismatch fails silently and disables rack-aware fetching.
