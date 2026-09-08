@@ -134,6 +134,8 @@ ORDER BY consumer_lag DESC
 ;
 
 -- Broker Connection Health
+-- librdkafka counters: tx/rx are request/response COUNTS, txbytes/rxbytes are
+-- BYTES. Use the byte counters to attribute per-broker (and cross-AZ) traffic.
 WITH JSONExtract(
     rdkafka_stat,
     'Tuple(
@@ -141,8 +143,10 @@ WITH JSONExtract(
             state String,
             stateage Int64,
             tx Int64,
-            rx Int64,
+            txbytes Int64,
             txerrs Int64,
+            rx Int64,
+            rxbytes Int64,
             rxerrs Int64,
             connects Int64,
             disconnects Int64
@@ -156,6 +160,8 @@ SELECT
     table,
     broker,
     tupleElement(broker_data, 'state') AS state,
+    tupleElement(broker_data, 'rxbytes') AS received_bytes,
+    tupleElement(broker_data, 'txbytes') AS transmitted_bytes,
     tupleElement(broker_data, 'txerrs') AS tx_errors,
     tupleElement(broker_data, 'rxerrs') AS rx_errors,
     tupleElement(broker_data, 'connects') AS connects,
