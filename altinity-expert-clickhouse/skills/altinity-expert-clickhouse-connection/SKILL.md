@@ -1,60 +1,69 @@
 ---
 name: altinity-expert-clickhouse-connection
-description: Establishes the ClickHouse connection mode, cluster macro, and default log timeframe for diagnostics. Use first, before any other altinity-expert-clickhouse skill, to verify connectivity and set shared analysis rules.
+description: Establishes how to reach ClickHouse (MCP tool or clickhouse-client), the cluster name for clusterAllReplicas('{cluster}', ...) query packs, the default 24-hour time window, and the shared report header. Use first, before any other altinity-expert-clickhouse skill.
 license: Apache-2.0
 ---
 
-## Connection mode
+# Connection, cluster and time window
 
-Decide connection mode first and verify connectivity then:
-```sql
-select
-    hostName() as hostname,
-    version() as version,
-    getMacro('cluster') as cluster_name,
-    formatReadableTimeDelta(uptime()) as uptime_human,
-    getSetting('max_memory_usage') as max_memory_usage,
-    (select value from system.asynchronous_metrics where metric = 'OSMemoryTotal') as os_memory_total
-```
+Run this before any other `altinity-expert-clickhouse-*` skill. It produces the facts every later skill reuses: connection mode, cluster name (or single node), ClickHouse version, Keeper presence, time window.
 
-### MCP mode
+## Step 1: choose the connection mode
 
-Try to use MCP server with clickhouse in the name.
-If multiple ClickHouse MCP servers are available, ask the user which one to use.
-When executing queries by the MCP server, push a single SQL statement to the MCP server (no multi-query!)
+Check your available tools in this order and stop at the first match:
 
-### Exec mode (clickhouse-client)
+1. **MCP mode**: a tool whose name contains `clickhouse` and one of `query`, `execute`, `sql` (for example `clickhouse_execute_query`, `mcp__clickhouse__execute_query`). Send exactly one SQL statement per call. If several ClickHouse MCP servers exist, ask the user which one to use.
+2. **Exec mode**: a shell tool plus `clickhouse-client` (or `clickhouse client`). Use only the connection flags the user provided (`--host`, `--port`, `--user`, `--password`, `--secure`); do not guess credentials from environment variables. Run one statement per invocation with `--query "<statement>"`. Never use `--queries-file` or `--multiquery`.
+3. **Neither**: stop and ask the user how to reach ClickHouse. Do not install software and do not write helper scripts.
 
-- if MCP is unavailable, try to run `clickhouse-client`. Don't rely on env vars. On failure, ask how to run it properly.
-- Prefer running queries from a `.sql` file with `--queries-file` and forcing JSON output (`-f JSON`) when capturing results to files.
+## Step 2: verify connectivity and collect header facts
 
-## Cluster selection for `clusterAllReplicas('{cluster}', ...)`
-
-- Verify from the query results above if a cluster_name (cluster macro var) is not empty. If defined - leave macro as-is.
-- if not, ask the user to choose from: `SELECT DISTINCT cluster FROM system.clusters where not is_local` and replace `'{cluster}'` placeholders in the queries in all `.sql` files.
-- if the query above returns nothing, consider single-server mode and automatically rewrite `clusterAllReplicas('{cluster}', system.<table>)` → `system.<table>` before execution.
-
-## Timeframe default for logs/errors
-
-- If the user explicitly provides a timeframe in the initial prompt, use it exactly.
-- Otherwise always default to **last 24 hours**:
+Run this one statement. It works on a standalone server (no macro, no Keeper) and on a cluster:
 
 ```sql
--- Use this pattern for system.*_log tables and system.errors time filters:
--- WHERE event_time >= now() - INTERVAL 24 HOUR
+SELECT
+    hostName() AS hostname,
+    version() AS version,
+    (SELECT substitution FROM system.macros WHERE macro = 'cluster') AS cluster_macro,
+    (SELECT groupUniqArray(cluster) FROM system.clusters WHERE NOT is_local) AS candidate_clusters,
+    (SELECT count() FROM system.tables WHERE database = 'system' AND name = 'zookeeper_connection') AS has_keeper,
+    formatReadableTimeDelta(uptime()) AS uptime,
+    formatReadableSize((SELECT value FROM system.asynchronous_metrics WHERE metric = 'OSMemoryTotal')) AS os_memory_total
 ```
-- never extend the time window without an explicit user prompt. If needed, ask the user to extend it
 
-## Schema-safe rule
+If it fails with an authentication or network error, stop and ask for the connection details. Do not retry with guessed credentials.
 
-- If a query fails with `UNKNOWN_IDENTIFIER`, run `DESCRIBE TABLE system.<table>` and drop/adjust only the missing columns.
-- If a query fails with `UNKNOWN_TABLE`, skip that query and note the table is disabled or unavailable (e.g., `system.part_log`, `system.detached_parts`).
+## Step 3: decide the cluster mode
 
-## Report Output
+- `cluster_macro` is not empty → **cluster mode**. Leave `'{cluster}'` in every query pack exactly as written; the server expands the macro.
+- `cluster_macro` is empty and `candidate_clusters` is not empty → ask the user which cluster to use, then replace `'{cluster}'` with that name in each statement before running it.
+- Both empty → **single-node mode**. Replace `clusterAllReplicas('{cluster}', system.<table>)` with `system.<table>` in each statement before running it.
 
-In all reports, always provide a header with information:
-- Connection mode used: MCP or clickhouse-client
-- cluster name (or “no cluster / single node”)
-- clickhouse version
-- time window used for analysis
+`has_keeper = 0` means no Keeper/ZooKeeper: skip every statement marked `-- @requires keeper` and report replication and ON CLUSTER checks as not applicable.
 
+## Step 4: fix the time window
+
+- If the user gave a time range, use it exactly.
+- Otherwise use the last 24 hours (`event_time >= now() - INTERVAL 24 HOUR`). Packs already use relative windows; do not widen them without asking.
+
+## How to run the query packs (applies to every skill)
+
+1. Read each pack file from the skill's directory (the skill loader prints the directory path).
+2. Run statements one at a time, never a whole file. Statements end with `;` and start with a `-- @check <id> <title>` header; keep the id with its result.
+3. Honor `-- @requires`: skip the statement when the named table is missing, when `keeper` is required and `has_keeper = 0`, or when the version condition is not met. List skipped ids with the reason.
+4. Keep `{cluster}` as decided in Step 3. Any other `{placeholder}` is a template variable: substitute a real value first or skip the statement.
+5. On an error, record the check id and the first line of the error, then continue with the next statement. Only for `UNKNOWN_IDENTIFIER`, run `DESCRIBE TABLE system.<table>` and drop the missing column.
+6. A `severity` column is the verdict for that row. Copy it; do not re-grade.
+
+## Report header
+
+Start every report with this table, filled from Step 2:
+
+| Connection mode | Cluster | ClickHouse version | Keeper | Time window |
+|---|---|---|---|---|
+| MCP or clickhouse-client | macro value, chosen cluster, or "single node" | version | yes/no | window used |
+
+## Next skills
+
+- Unknown problem area or general health check → load skill `altinity-expert-clickhouse-overview`
+- Known symptom → load the matching specialist skill (memory, merges, replication, ingestion, reporting, storage, ...)

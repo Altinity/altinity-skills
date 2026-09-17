@@ -1,113 +1,81 @@
 ---
 name: altinity-expert-clickhouse-reporting
-description: Diagnose ClickHouse SELECT query performance, analyze query patterns, identify slow queries, and find optimization opportunities. Use for query latency and timeout issues.
+description: Diagnoses ClickHouse SELECT query performance, query patterns, slow queries, failures and optimization opportunities. Use for query latency, timeouts, high CPU queries, queries reading too much data and repeated expensive query patterns.
 license: Apache-2.0
 ---
 
-# Query Performance Analysis
+# Query performance analysis
 
-Diagnose SELECT query performance issues, analyze query patterns, and identify optimization opportunities.
+Answers "which queries are slow or failing and why" from `system.query_log`, `system.processes` and `system.query_views_log`. Queries are grouped by `normalized_query_hash`, which collapses literals so one row represents a query pattern, not a single execution.
+Run `altinity-expert-clickhouse-connection` first if the connection mode, cluster and time window are not yet established.
 
----
+## Query packs
 
-## Diagnostics
+- `checks.sql` — 15 checks: currently running queries, recent performance summary, slowest queries, most frequent query patterns, queries by CPU time, queries reading too much data, queries by table accessed, recent failures and failure summary by error code, query type distribution, peak query hours, queries by user, materialized-view execution during inserts, slow materialized-view breakdown per query and distributed query performance. 2 of them need `system.query_views_log`.
+- `reference.md` — background (settings, sizing, anti-patterns); read only when you need to explain a recommendation.
 
-Run all queries from `checks.sql` in this skill's directory and analyze the results.
+## How to run the query packs
 
----
+1. Read each pack file from this skill's directory (the skill loader prints the directory path).
+2. Run statements one at a time, never a whole file. Statements end with `;` and start with a `-- @check <id> <title>` header; keep the id with its result.
+3. Honor `-- @requires`: skip the statement when the named table is missing, when `keeper` is required and the server has no Keeper/ZooKeeper, or when the version condition is not met. List skipped ids with the reason.
+4. Keep `{cluster}` as written when a cluster macro exists; otherwise apply the connection skill's rewrite rule. Any other `{placeholder}` is a template variable: substitute a real value first or skip the statement.
+5. On an error, record the check id and the first line of the error, then continue. Only for `UNKNOWN_IDENTIFIER`, run `DESCRIBE TABLE system.<table>` and drop the missing column.
+6. A `severity` column is the verdict for that row. Copy it; do not re-grade.
 
-## Query Optimization Hints
+## Deep-dive statements
 
-### Index Usage Check
-
-```sql
--- Check if data skipping indices exist
-select
-    database,
-    table,
-    name as index_name,
-    type,
-    expr,
-    granularity
-from system.data_skipping_indices
-where database = '{database}' and table = '{table}'
-```
-
-### Mark Count for Query
-
-For a specific slow query, check how many marks (granules) were read:
+For one slow query with a known `query_id`, measure index selectivity. `SelectedMarks` divided by `SelectedMarksTotal` is the fraction of the table the primary index failed to prune: close to 1 means the ORDER BY key did not help.
 
 ```sql
-select
+SELECT
     query_id,
     read_rows,
-    selected_marks,
-    selected_parts,
-    formatReadableSize(read_bytes) as read_bytes,
-    round(read_rows / nullIf(selected_marks, 0)) as rows_per_mark
-from system.query_log
-where query_id = '{query_id}'
-  and type = 'QueryFinish'
+    result_rows,
+    formatReadableSize(read_bytes) AS read_bytes,
+    ProfileEvents['SelectedParts'] AS selected_parts,
+    ProfileEvents['SelectedMarks'] AS selected_marks,
+    ProfileEvents['SelectedMarksTotal'] AS selected_marks_total,
+    round(ProfileEvents['SelectedMarks'] / nullIf(ProfileEvents['SelectedMarksTotal'], 0), 4) AS marks_read_fraction
+FROM clusterAllReplicas('{cluster}', system.query_log)
+WHERE query_id = '{query_id}' AND type = 'QueryFinish';
 ```
 
-**High `selected_marks`** relative to result = index not selective enough.
+Then check whether the table has data skipping indexes that could prune further.
 
----
-
-## Ad-Hoc Query Guidelines
-
-### Required Safeguards
 ```sql
--- Always time-bound
-where event_date >= today() - 1
--- or
-where event_time > now() - interval 1 hour
-
--- Always limit
-limit 100
-
--- Filter by type
-where type = 'QueryFinish'  -- completed
-where type like 'Exception%'  -- failed
+SELECT database, table, name AS index_name, type, expr, granularity
+FROM clusterAllReplicas('{cluster}', system.data_skipping_indices)
+WHERE database = '{database}' AND table = '{table}';
 ```
 
-### Useful Filters
-```sql
--- By user
-where user = 'analytics_user'
+## Interpretation rules
 
--- By query pattern
-where query ilike '%SELECT%FROM my_table%'
+- `read_rows` far larger than `result_rows` is poor selectivity, not a slow server. Quote both numbers and route to the index analysis skill; the fix is the ORDER BY key or a skip index, not more hardware.
+- Group findings by `normalized_query_hash`. A pattern run 5000 times at 200 ms costs more than one query at 60 s, and only the pattern view makes that visible. Report the pattern and its total time, not the single worst execution.
+- The same `normalized_query_hash` appearing repeatedly with identical results is a query cache candidate; check the caches skill before optimizing the query itself.
+- High `memory_usage` on a query points at the aggregation or join, not the scan. Route to the memory skill rather than recommending an index.
+- A query touching many parts (`SelectedParts` high relative to table part count) is reading through a merge backlog. Fix the merges first; the query plan may already be optimal.
+- Slow materialized views found by reporting-13 and reporting-14 slow down the INSERT that triggers them, not the SELECT. That finding belongs to the ingestion path.
+- Failures: `type IN ('ExceptionBeforeStart', 'ExceptionWhileProcessing')` are two different things. ExceptionBeforeStart means the query never ran (parse, access, or limit rejection); ExceptionWhileProcessing means it ran and died, usually on a memory or timeout limit.
+- Ignore error codes generated by this diagnostic session itself (UNKNOWN_IDENTIFIER, UNKNOWN_TABLE, SYNTAX_ERROR) when summarizing failures.
 
--- By duration threshold
-where query_duration_ms > 10000  -- > 10 seconds
+## Report format
 
--- By normalized hash (for specific query pattern)
-where normalized_query_hash = 1234567890
-```
+1. **Header**: connection mode, cluster or "single node", ClickHouse version, time window.
+2. **Findings**: table with columns `check`, `severity`, `object`, `evidence`, `recommendation`; one row per finding, Critical first. Evidence quotes the numbers from the result rows.
+3. **OK checks**: one line listing the check ids that returned no problem rows.
+4. **Skipped and failed checks**: id and reason or first error line. Never omit this section.
+5. **Next steps**: skills to load next and immediate actions.
 
----
+## Next skills
 
-## Cross-Module Triggers
-
-| Finding | Load Module | Reason |
-|---------|-------------|--------|
-| High memory queries | `altinity-expert-clickhouse-memory` | Memory limits/optimization |
-| Reading too many parts | `altinity-expert-clickhouse-merges` | Part consolidation |
-| Poor index selectivity | `altinity-expert-clickhouse-schema` | Index/ORDER BY design |
-| Cache misses | `altinity-expert-clickhouse-caches` | Cache sizing |
-| MV slow | `altinity-expert-clickhouse-ingestion` | MV optimization |
-
----
-
-## Settings Reference
-
-| Setting | Scope | Notes |
-|---------|-------|-------|
-| `max_execution_time` | Query | Query timeout |
-| `max_rows_to_read` | Query | Limit rows scanned |
-| `max_bytes_to_read` | Query | Limit bytes scanned |
-| `max_threads` | Query | Parallelism |
-| `use_query_cache` | Query | Enable query result caching |
-| `log_queries` | Server | Enable query logging |
-| `log_queries_min_query_duration_ms` | Server | Log threshold |
+- `read_rows` far above `result_rows`, low marks-pruning fraction, missing or unused skip indexes → load skill `altinity-expert-clickhouse-index-analysis`
+- High per-query memory or MEMORY_LIMIT_EXCEEDED failures → load skill `altinity-expert-clickhouse-memory`
+- Queries reading many parts per table → load skill `altinity-expert-clickhouse-merges`
+- Repeated identical queries, low mark or uncompressed cache hit rate → load skill `altinity-expert-clickhouse-caches`
+- Slow materialized views during inserts → load skill `altinity-expert-clickhouse-ingestion`
+- ORDER BY, partitioning or materialized view design looks wrong → load skill `altinity-expert-clickhouse-schema`
+- Distributed query slower than the sum of its shards, or one replica lagging → load skill `altinity-expert-clickhouse-replication`
+- ACCESS_DENIED or authentication failures among the error codes → load skill `altinity-expert-clickhouse-grants`
+- Query latency correlating with disk read throughput → load skill `altinity-expert-clickhouse-storage`

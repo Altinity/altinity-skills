@@ -1,4 +1,5 @@
 -- Kafka Health
+-- @check ingestion-01 Kafka Health
 select
     database,
     table,
@@ -15,6 +16,7 @@ limit 50
 ;
 
 -- Kafka scheduling capacity
+-- @check ingestion-02 Kafka scheduling capacity
 select
     hostName() as host,
     sumIf(value, metric = 'KafkaConsumers') as kafka_consumers,
@@ -26,6 +28,7 @@ order by host
 ;
 
 -- Current Insert Activity
+-- @check ingestion-03 Current Insert Activity
 select
     hostName() as host,
     query_id,
@@ -42,6 +45,7 @@ limit 20
 ;
 
 -- Recent Insert Performance (Last Hour)
+-- @check ingestion-04 Recent Insert Performance (Last Hour)
 select
     hostName() as host,
     toStartOfFiveMinutes(event_time) as ts,
@@ -63,6 +67,8 @@ limit 20
 -- Red flags:
 -- parts_created > 60 per minute (> 1/sec) → Batching too small
 -- avg_rows_per_part < 10000 → Micro-batches, will cause merge pressure
+-- @check ingestion-05 Part Creation Rate by Table
+-- @requires table:system.part_log
 select
     hostName() as host,
     database,
@@ -81,6 +87,8 @@ limit 30
 
 -- Insert vs Merge Balance
 -- If net_reduction negative → Load altinity-expert-clickhouse-merges for merge backlog analysis
+-- @check ingestion-06 Insert vs Merge Balance
+-- @requires table:system.part_log
 select
     hostName() as host,
     database,
@@ -98,6 +106,7 @@ limit 20
 
 -- Slow Inserts Investigation
 -- Find slowest inserts
+-- @check ingestion-07 Slow Inserts Investigation
 select
     hostName() as host,
     event_time,
@@ -120,6 +129,8 @@ limit 20
 -- Insert with MV Overhead
 -- Find slow MVs during inserts
 -- When inserts feed materialized views, slow MVs cause insert delays.
+-- @check ingestion-08 Insert with MV Overhead
+-- @requires table:system.query_views_log
 select
     hostName() as host,
     toStartOfFiveMinutes(qvl.event_time) as ts,
@@ -140,6 +151,7 @@ limit 20
 -- 241 (MEMORY_LIMIT_EXCEEDED) → Load altinity-expert-clickhouse-memory
 -- 252 (TOO_MANY_PARTS) → Load altinity-expert-clickhouse-merges
 -- 319 (UNKNOWN_PACKET_FROM_CLIENT) → Client/network issue
+-- @check ingestion-09 Failed Inserts
 select
     hostName() as host,
     event_time,
@@ -148,7 +160,7 @@ select
     exception,
     substring(query, 1, 150) as query_preview
 from clusterAllReplicas('{cluster}', system.query_log)
-where type like 'Exception%'
+where type IN ('ExceptionBeforeStart', 'ExceptionWhileProcessing')
   and query_kind = 'Insert'
   and event_date = today()
 order by event_time desc, host asc
@@ -156,6 +168,7 @@ limit 30
 ;
 
 -- Batch Size Analysis
+-- @check ingestion-10 Batch Size Analysis
 select
     hostName() as host,
     arrayStringConcat(tables, ', ') as target_tables,
@@ -183,6 +196,7 @@ limit 20
 
 -- Kafka Engine Ingestion
 -- Check Kafka consumer lag (if using Kafka engine)
+-- @check ingestion-11 Kafka Engine Ingestion
 select
     hostName() as host,
     database,
@@ -195,6 +209,8 @@ where engine like '%Kafka%'
 ;
 
 -- Kafka-related messages in logs
+-- @check ingestion-12 Kafka-related messages in logs
+-- @requires table:system.text_log
 select
     hostName() as host,
     event_time,
@@ -209,6 +225,7 @@ limit 50
 
 -- Optional Context: Buffer Table Flush Patterns
 -- Buffer table status
+-- @check ingestion-13 Optional Context: Buffer Table Flush Patterns
 select
     hostName() as host,
     database,
@@ -220,6 +237,7 @@ where engine = 'Buffer'
 ;
 
 -- Optional Context: Check current settings for insert
+-- @check ingestion-14 Optional Context: Check current settings for insert
 select
     hostName() as host,
     name, value, changed

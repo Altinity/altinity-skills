@@ -1,0 +1,38 @@
+<!--
+  Test-suite ClickHouse config snippet: enable the system log tables that are
+  opt-in on default installs, so every skill query pack has a table to run
+  against. Skills must still cope with these tables being absent on real
+  servers (see the `@requires table:` statement headers).
+-->
+<clickhouse>
+    <part_log>
+        <database>system</database>
+        <table>part_log</table>
+        <flush_interval_milliseconds>1000</flush_interval_milliseconds>
+    </part_log>
+
+    <query_views_log>
+        <database>system</database>
+        <table>query_views_log</table>
+        <flush_interval_milliseconds>1000</flush_interval_milliseconds>
+    </query_views_log>
+
+    <crash_log>
+        <database>system</database>
+        <table>crash_log</table>
+        <partition_by />
+        <flush_interval_milliseconds>1000</flush_interval_milliseconds>
+    </crash_log>
+
+    <session_log>
+        <database>system</database>
+        <table>session_log</table>
+        <flush_interval_milliseconds>1000</flush_interval_milliseconds>
+    </session_log>
+
+    <zookeeper_log>
+        <database>system</database>
+        <table>zookeeper_log</table>
+        <flush_interval_milliseconds>1000</flush_interval_milliseconds>
+    </zookeeper_log>
+</clickhouse>

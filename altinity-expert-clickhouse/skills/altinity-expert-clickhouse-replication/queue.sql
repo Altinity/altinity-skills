@@ -2,6 +2,7 @@
 Interpretation:
 - Large queues + old tasks + retries/backoff usually means replication is stuck.
 */
+-- @check replication-queue-01 Queue size by table (per host)
 WITH
   count() AS count_all,
   countIf(last_exception != '') AS count_err,
@@ -25,6 +26,7 @@ LIMIT 200;
 /* 4) Queue tasks with errors/backoff (per host)
 Use this to identify a table/type to drill down further.
 */
+-- @check replication-queue-02 Queue tasks with errors/backoff (per host)
 SELECT
   hostName() AS host,
   database,

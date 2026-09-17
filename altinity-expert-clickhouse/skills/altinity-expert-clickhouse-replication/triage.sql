@@ -1,4 +1,6 @@
 /* 1) Keeper/ZooKeeper session status (per host) */
+-- @requires keeper
+-- @check replication-triage-01 Keeper/ZooKeeper session status (per host)
 SELECT hostName() AS ch_host, *
 FROM clusterAllReplicas('{cluster}', system.zookeeper_connection)
 ORDER BY host;
@@ -9,6 +11,7 @@ Red flags:
 - active_replicas < total_replicas => replicas missing
 - absolute_delay > 300s => lag
 */
+-- @check replication-triage-02 Replication overview (triage)
 SELECT
   hostName() AS host,
   database,

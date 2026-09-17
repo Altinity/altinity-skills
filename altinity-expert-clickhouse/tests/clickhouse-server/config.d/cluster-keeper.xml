@@ -1,0 +1,58 @@
+<!--
+  Test-suite ClickHouse config snippet: single-container "cluster".
+
+  Runs an embedded ClickHouse Keeper inside the server process and declares a
+  one-shard, one-replica cluster named `test_cluster` that points back at the
+  server itself. This lets the skills' `clusterAllReplicas('{cluster}', ...)`
+  query packs, `getMacro('cluster')`, `system.zookeeper_connection`,
+  `system.distributed_ddl_queue` and ReplicatedMergeTree fixtures run against a
+  throwaway container with no extra services.
+-->
+<clickhouse>
+    <keeper_server>
+        <tcp_port>9181</tcp_port>
+        <server_id>1</server_id>
+        <log_storage_path>/var/lib/clickhouse/coordination/log</log_storage_path>
+        <snapshot_storage_path>/var/lib/clickhouse/coordination/snapshots</snapshot_storage_path>
+        <coordination_settings>
+            <operation_timeout_ms>10000</operation_timeout_ms>
+            <session_timeout_ms>30000</session_timeout_ms>
+            <raft_logs_level>warning</raft_logs_level>
+        </coordination_settings>
+        <raft_configuration>
+            <server>
+                <id>1</id>
+                <hostname>localhost</hostname>
+                <port>9234</port>
+            </server>
+        </raft_configuration>
+    </keeper_server>
+
+    <zookeeper>
+        <node>
+            <host>localhost</host>
+            <port>9181</port>
+        </node>
+    </zookeeper>
+
+    <macros>
+        <cluster>test_cluster</cluster>
+        <shard>01</shard>
+        <replica>replica1</replica>
+    </macros>
+
+    <remote_servers replace="replace">
+        <test_cluster>
+            <shard>
+                <replica>
+                    <host>localhost</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </test_cluster>
+    </remote_servers>
+
+    <distributed_ddl>
+        <path>/clickhouse/task_queue/ddl</path>
+    </distributed_ddl>
+</clickhouse>

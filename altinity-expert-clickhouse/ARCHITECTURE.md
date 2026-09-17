@@ -194,3 +194,41 @@ Single-node mode:
 
 - Do not detect “single node” by `system.clusters` being empty (many installs define a `default` cluster even on one node).
 - If there is exactly one configured cluster and it is local-only (one endpoint and `is_local=1`), run in **local mode** by automatically rewriting `clusterAllReplicas('{cluster}', system.<table>)` → `system.<table>` before execution.
+
+## Skill file conventions (added 2026-09)
+
+All 19 skills follow `SKILL_TEMPLATE.md` in this directory: identical "How to run the
+query packs" and "Report format" sections, skill-specific "Interpretation rules",
+explicit "Next skills" routing (`load skill altinity-expert-clickhouse-<name>`), and
+optional `reference.md` for background material that a model should read only when it
+needs to explain a recommendation. The template exists so that mid-size models execute
+every skill the same way; do not add generic ClickHouse knowledge to SKILL.md.
+
+Query pack statements carry machine-readable headers:
+
+```sql
+-- @check merges-04 Merge success/failure trend by hour (24h)
+-- @requires table:system.part_log
+SELECT ... ;
+```
+
+- `@check <id> <title>`: stable id reported back in findings.
+- `@requires table:system.X | keeper | version>=X.Y | version<X.Y | kafka`: skip the
+  statement when unmet instead of failing. Version-gated alternatives of the same check
+  share the id (used for the 26.8 `key_values` async-metric layout change).
+- `@skip-matrix <reason>`: multi-step session recipes the matrix must not run.
+
+Every check that can be graded returns a `severity` column (`Critical`, `Major`,
+`Moderate`, `Minor`, `OK`) so the model copies verdicts instead of inventing them.
+
+### Testing layers
+
+1. `tests/sql-matrix/`: `make matrix-up sql-matrix` runs every statement of every pack
+   against ClickHouse 24.8, 25.8 and 26.8 containers configured as a one-node replicated
+   cluster with embedded Keeper (`tests/clickhouse-server/config.d/cluster-keeper.xml`)
+   and all optional logs enabled. Any error not covered by `@requires` fails the run.
+2. `tests/<skill>/`: scenario fixtures (`dbschema.sql`, `scenarios/`) and `expected.md`.
+3. `tests/opencode/`: `run_suite.sh` runs the model under test (OpenCode, read-only
+   agent, temperature 0) in arms `none` / `old` / `new` and scores tool behaviour and
+   report content deterministically (`assert_run.py`). Use it to prove a skill change
+   helps the model rather than only adding context.

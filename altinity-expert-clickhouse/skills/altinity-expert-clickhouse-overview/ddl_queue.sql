@@ -1,4 +1,6 @@
--- DDL Queue Health
+-- DDL Queue Health (ON CLUSTER queue; only meaningful with Keeper/ZooKeeper configured)
+-- @requires keeper
+-- @check overview-ddl-queue-01 DDL queue health (ON CLUSTER)
 WITH
     600  AS active_stuck_s,   -- “Active” older than this => jam
     100  AS backlog_warn,

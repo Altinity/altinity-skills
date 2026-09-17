@@ -126,6 +126,26 @@ use skill `altinity-expert-clickhouse-overview` Analyze cluster health
 ```
 
 
+---
+
+### OpenCode
+
+OpenCode discovers Agent Skills from a project's `.opencode/skills/` directory (and `.claude/skills/`, `.agents/skills/`), following symlinks. Keep skills project-local:
+
+```bash
+git clone https://github.com/Altinity/altinity-skills.git
+mkdir -p .opencode
+ln -s "$(pwd)/altinity-skills/altinity-expert-clickhouse/skills" .opencode/skills
+```
+
+The model loads a skill with its `skill` tool; ask for it by name:
+```
+Use the altinity-expert-clickhouse-connection skill, then altinity-expert-clickhouse-overview, and report server health.
+```
+
+Tested with mid-size open models (Qwen 3.8 flash-next) at `temperature: 0`; see `altinity-expert-clickhouse/tests/opencode/` for the evaluation harness and a ready-made read-only agent definition.
+
+
 ## Docker Image
 
 A pre-built Docker image with Claude Code, Codex CLI, and all skills is available:

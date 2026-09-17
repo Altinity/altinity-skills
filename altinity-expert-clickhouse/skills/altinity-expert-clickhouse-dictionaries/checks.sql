@@ -1,4 +1,5 @@
 -- Dictionary Overview
+-- @check dictionaries-01 Dictionary Overview
 select
     hostName() as host,
     database,
@@ -16,6 +17,7 @@ order by bytes_allocated desc, host asc
 ;
 
 -- Dictionary Health Check
+-- @check dictionaries-02 Dictionary Health Check
 select
     hostName() as host,
     database,
@@ -38,6 +40,7 @@ order by
 ;
 
 -- Memory Usage Audit
+-- @check dictionaries-03 Memory Usage Audit
 select
     d.host as host,
     formatReadableSize(dict_memory) as total_dictionary_memory,
@@ -64,6 +67,7 @@ left join
 ;
 
 -- Top Dictionaries by Memory
+-- @check dictionaries-04 Top Dictionaries by Memory
 select
     hostName() as host,
     database,
@@ -81,6 +85,7 @@ limit 20
 ;
 
 -- Dictionary Configuration
+-- @check dictionaries-05 Dictionary Configuration
 select
     hostName() as host,
     database,
@@ -98,25 +103,33 @@ order by name, host asc
 ;
 
 -- Dictionary Staleness Check
+-- @check dictionaries-06 Dictionary Staleness Check
 select
     hostName() as host,
     database,
     name,
     last_successful_update_time,
-    dateDiff('minute', last_successful_update_time, now()) as minutes_since_update,
-    lifetime_max,
+    dateDiff('second', last_successful_update_time, now()) as seconds_since_update,
+    lifetime_max as lifetime_max_seconds,
     multiIf(
-        minutes_since_update > lifetime_max * 2, 'Critical - very stale',
-        minutes_since_update > lifetime_max, 'Major - past lifetime',
-        minutes_since_update > lifetime_max * 0.9, 'Moderate - approaching lifetime',
+        seconds_since_update > lifetime_max * 2, 'Critical',
+        seconds_since_update > lifetime_max, 'Major',
+        seconds_since_update > lifetime_max * 0.9, 'Moderate',
         'OK'
-    ) as freshness
+    ) as severity,
+    multiIf(
+        seconds_since_update > lifetime_max * 2, 'very stale: more than 2x lifetime since last successful update',
+        seconds_since_update > lifetime_max, 'past lifetime: reload overdue or failing',
+        seconds_since_update > lifetime_max * 0.9, 'approaching lifetime',
+        'fresh'
+    ) as note
 from clusterAllReplicas('{cluster}', system.dictionaries)
 where lifetime_max > 0
-order by minutes_since_update desc, host asc
+order by seconds_since_update desc, host asc
 ;
 
 -- Current Failures
+-- @check dictionaries-07 Current Failures
 select
     hostName() as host,
     database,
@@ -130,6 +143,8 @@ where status = 'FAILED' or last_exception != ''
 ;
 
 -- Dictionary Load Errors in Logs
+-- @check dictionaries-08 Dictionary Load Errors in Logs
+-- @requires table:system.text_log
 select
     hostName() as host,
     event_time,
@@ -145,6 +160,7 @@ limit 30
 ;
 
 -- Lookup Performance (via query_log)
+-- @check dictionaries-09 Lookup Performance (via query_log)
 select
     hostName() as host,
     normalized_query_hash,
@@ -161,6 +177,7 @@ limit 20
 ;
 
 -- Dictionary Hit/Miss Ratio
+-- @check dictionaries-10 Dictionary Hit/Miss Ratio
 select
     hostName() as host,
     'DictCacheHits' as metric,
@@ -179,6 +196,7 @@ settings system_events_show_zero_values = 1
 
 -- Cache Dictionary Analysis
 -- For cache dictionaries, check hit rate and size
+-- @check dictionaries-11 Cache Dictionary Analysis
 select
     hostName() as host,
     database,
@@ -188,10 +206,11 @@ select
     formatReadableSize(bytes_allocated) as memory,
     loading_duration
 from clusterAllReplicas('{cluster}', system.dictionaries)
-where type like '%cache%'
+where lower(type) like '%cache%'
 ;
 
 -- Flat/Hashed Dictionary Size Check
+-- @check dictionaries-12 Flat/Hashed Dictionary Size Check
 select
     hostName() as host,
     database,
@@ -207,6 +226,7 @@ order by bytes_allocated desc, host asc
 ;
 
 -- Identify Source Types
+-- @check dictionaries-13 Identify Source Types
 select
     hostName() as host,
     source,
@@ -218,6 +238,7 @@ order by sum(bytes_allocated) desc, host asc
 ;
 
 -- Check Source Connectivity (for ClickHouse source dictionaries)
+-- @check dictionaries-14 Check Source Connectivity (for ClickHouse source dictionaries)
 select
     hostName() as host,
     name as dictionary_name,
@@ -227,6 +248,7 @@ where source like '%clickhouse%'
 ;
 
 -- Scheduled Reload Check
+-- @check dictionaries-15 Scheduled Reload Check
 select
     hostName() as host,
     database,

@@ -8,8 +8,13 @@ services:
       - "9000:9000"   # native
       - "8123:8123"   # http
     volumes:
-      - ./clickhouse-server/config.d:/etc/clickhouse-server/config.d:ro
-      - ./clickhouse-server/users.d:/etc/clickhouse-server/users.d:ro
+      # Mount files one by one: mounting the whole config.d hides the image's
+      # docker_related_config.xml (listen_host) and breaks the published ports.
+      - ./clickhouse-server/config.d/cluster-keeper.xml:/etc/clickhouse-server/config.d/cluster-keeper.xml:ro
+      - ./clickhouse-server/config.d/optional-logs.xml:/etc/clickhouse-server/config.d/optional-logs.xml:ro
+      - ./clickhouse-server/config.d/memory-test.xml:/etc/clickhouse-server/config.d/memory-test.xml:ro
+      - ./clickhouse-server/config.d/test-suite-logs.xml:/etc/clickhouse-server/config.d/test-suite-logs.xml:ro
+      - ./clickhouse-server/users.d/default-no-password.xml:/etc/clickhouse-server/users.d/default-no-password.xml:ro
       - clickhouse-data:/var/lib/clickhouse
     ulimits:
       nofile:

@@ -3,6 +3,7 @@
 -- hit_ratio < 0.7 → Cache too small or access pattern not cache-friendly
 -- pct_of_ram > 15% → Cache consuming too much RAM
 -- pct_marks_cached < 1% → Very few marks in cache (might be OK for large datasets)
+-- @check caches-01 Mark Cache Health
 select
     hostName() as host,
     'Mark Cache' as cache,
@@ -63,6 +64,7 @@ settings system_events_show_zero_values = 1
 
 -- Uncompressed Cache Health
 -- Note: Uncompressed cache is disabled by default. Low hit ratio is normal if not explicitly configured.
+-- @check caches-02 Uncompressed Cache Health
 select
     hostName() as host,
     'Uncompressed Cache' as cache,
@@ -108,6 +110,7 @@ settings system_events_show_zero_values = 1
 ;
 
 -- Query Cache Health (v23.1+)
+-- @check caches-03 Query Cache Health (v23.1+)
 select
     hostName() as host,
     'Query Cache' as cache,
@@ -118,6 +121,7 @@ group by host
 ;
 
 -- Compiled Expression Cache
+-- @check caches-04 Compiled Expression Cache
 select
     hostName() as host,
     'Compiled Expression Cache' as cache,
@@ -138,6 +142,7 @@ settings system_events_show_zero_values = 1
 ;
 
 -- Mark Cache by Table
+-- @check caches-05 Mark Cache by Table
 select
     hostName() as host,
     database,
@@ -153,6 +158,7 @@ limit 20
 ;
 
 -- Primary Key Memory by Table
+-- @check caches-06 Primary Key Memory by Table
 select
     hostName() as host,
     database,
@@ -168,6 +174,8 @@ limit 20
 ;
 
 -- Cache Events Over Time
+-- @check caches-07 Cache Events Over Time
+-- @requires table:system.asynchronous_metric_log
 select
     hostName() as host,
     toStartOfFiveMinutes(event_time) as ts,
@@ -182,6 +190,7 @@ order by ts, host
 ;
 
 -- Current Cache Settings
+-- @check caches-08 Current Cache Settings
 select name, value, description
 from clusterAllReplicas('{cluster}', system.server_settings)
 where name in (
@@ -193,6 +202,7 @@ where name in (
 ;
 
 -- Sizing Analysis
+-- @check caches-09 Sizing Analysis
 select
     m.host as host,
     formatReadableSize(total_marks) as total_marks_size,
@@ -222,6 +232,7 @@ left join
 
 -- Poor Mark Cache Hit Ratio Diagnostic
 -- Check which tables are being queried
+-- @check caches-10 Poor Mark Cache Hit Ratio Diagnostic
 select
     hostName() as host,
     arrayStringConcat(tables, ', ') as tables,
@@ -237,6 +248,7 @@ limit 20
 ;
 
 -- Cache Too Large - Check for tables with excessive marks
+-- @check caches-11 Cache Too Large - Check for tables with excessive marks
 select
     prt.host as host,
     database,
@@ -271,6 +283,8 @@ limit 20
 ;
 
 -- Cache hit ratio over time (last hour)
+-- @check caches-12 Cache hit ratio over time (last hour)
+-- @requires table:system.metric_log
 select
     hostName() as host,
     toStartOfMinute(event_time) as ts,

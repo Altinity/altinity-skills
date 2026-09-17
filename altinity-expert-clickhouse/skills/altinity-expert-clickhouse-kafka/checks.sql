@@ -1,5 +1,6 @@
 -- Kafka Consumption Health
 -- Red flag: last_exception_time >= last_poll_time OR last_commit_time → consumer stuck on error
+-- @check kafka-01 Kafka Consumption Health
 SELECT
     hostName() AS host,
     database,
@@ -17,6 +18,7 @@ ORDER BY last_rebalance_time DESC, host ASC
 
 -- Avg Rows per Commit
 -- Shows batch efficiency per consumer
+-- @check kafka-02 Avg Rows per Commit
 SELECT
     hostName() AS host,
     database,
@@ -29,6 +31,7 @@ ORDER BY database ASC, `table` ASC, host ASC
 
 -- Rebalances and Assignments
 -- High num_rebalance_assignments/revocations or recent last_rebalance → instability
+-- @check kafka-03 Rebalances and Assignments
 SELECT
     hostName() AS host,
     database,
@@ -44,6 +47,7 @@ ORDER BY last_rebalance_time DESC, host ASC
 
 -- Kafka Consumers vs Pool Size
 -- Red flag: kafka_consumers > mb_pool_size → thread starvation, consumers waiting for threads
+-- @check kafka-04 Kafka Consumers vs Pool Size
 SELECT
     hostName() AS host,
     sumIf(value, metric = 'KafkaConsumers') AS kafka_consumers,
@@ -56,6 +60,8 @@ ORDER BY host
 
 -- Background Message Broker Pool Over Time (12h)
 -- Shows pool task utilization trends to detect thread starvation patterns
+-- @check kafka-05 Background Message Broker Pool Over Time (12h)
+-- @requires table:system.metric_log
 SELECT
     hostName() AS host,
     toStartOfMinute(event_time) AS time_bucket,
@@ -70,6 +76,8 @@ ORDER BY time_bucket ASC, host ASC
 -- Slow Materialized Views on Kafka Tables (24h)
 -- Red flag: avg duration > 30s → MV processing too slow, risks poll interval exceeded
 -- Common cause: multiple JSONExtract calls parsing the same JSON repeatedly
+-- @check kafka-06 Slow Materialized Views on Kafka Tables (24h)
+-- @requires table:system.query_views_log
 SELECT
     hostName() AS host,
     view_target,
@@ -87,6 +95,8 @@ LIMIT 10
 ;
 
 -- Kafka-related messages in logs
+-- @check kafka-07 Kafka-related messages in logs
+-- @requires table:system.text_log
 SELECT
     hostName() AS host,
     event_time,

@@ -4,44 +4,58 @@ description: Diagnose and resolve ClickHouse grant and authentication errors, es
 license: Apache-2.0
 ---
 
-## Diagnostics
+# Grant and authentication errors
 
-Run all queries from `checks.sql` in this skill's directory and analyze the results.
+Finds which privilege a blocked operation is missing and computes the smallest grant that unblocks it, from `system.errors`, `system.query_log`, `system.grants` and `system.role_grants`.
+Run `altinity-expert-clickhouse-connection` first if the connection mode, cluster and time window are not yet established.
 
-## Propose Minimal Grants
-Provide the smallest set of `GRANT` statements that match observed `needed_grant` values. Prefer role-based grants when the user already uses roles.
+## Query packs
 
-Example pattern:
+- `checks.sql` — 4 checks: access and authentication errors in `system.errors` over 24 hours (grants-01), missing privileges from queries that failed with exception code 497 (grants-02), current grants for the affected users (grants-03), roles assigned to the affected users (grants-04).
+- `reference.md` — background (privilege families, access_control_improvements defaults); read only when you need to explain a recommendation.
+
+## How to run the query packs
+
+1. Read each pack file from this skill's directory (the skill loader prints the directory path).
+2. Run statements one at a time, never a whole file. Statements end with `;` and start with a `-- @check <id> <title>` header; keep the id with its result.
+3. Honor `-- @requires`: skip the statement when the named table is missing, when `keeper` is required and the server has no Keeper/ZooKeeper, or when the version condition is not met. List skipped ids with the reason.
+4. Keep `{cluster}` as written when a cluster macro exists; otherwise apply the connection skill's rewrite rule. Any other `{placeholder}` is a template variable: substitute a real value first or skip the statement.
+5. On an error, record the check id and the first line of the error, then continue. Only for `UNKNOWN_IDENTIFIER`, run `DESCRIBE TABLE system.<table>` and drop the missing column.
+6. A `severity` column is the verdict for that row. Copy it; do not re-grade.
+
+## Interpretation rules
+
+- `missing_privileges` from grants-02 is the server's own answer. Build the `GRANT` statements from those values; do not infer the privilege from the query text.
+- Scope every grant to the narrowest object that clears the error: a column list or `db.table` over `db.*`, and `db.*` over `*.*`. A grant that is broader than needed clears the error today and becomes an audit finding later.
+- Prefer role-based grants when grants-04 shows the user already gets privileges through roles. Granting to the existing role keeps the model consistent; granting directly to the user splits it.
+- Authentication errors from grants-01 (`AUTHENTICATION_FAILED`, `WRONG_PASSWORD`, `REQUIRED_PASSWORD`) are not privilege problems. Do not propose a `GRANT` for them; the fix is the user's auth method or host ACL.
+- These privileges are exfiltration, SSRF or privilege-escalation surfaces. Grant the specific one needed, to a role, never the umbrella and never on `*.*`: `SOURCES` and its members `S3`, `URL`, `FILE`, `REMOTE` (plus `READ` and `WRITE` on 25.7+); `SYSTEM` and `INTROSPECTION`, scoped to the single subcommand.
+- Never grant `ACCESS MANAGEMENT`, `WITH GRANT OPTION`, `displaySecretsInShowAndSelect`, `NAMED COLLECTION ADMIN`, `ALLOW SQL SECURITY NONE` or `IMPERSONATE` to fix a routine ACCESS_DENIED. Each one is a privilege-escalation or secret-exposure path and needs explicit justification.
+- After an upgrade, check the `access_control_improvements` flags `select_from_system_db_requires_grant`, `select_from_information_schema_requires_grant` and `on_cluster_queries_require_cluster_grant`. When these are enabled, users that worked before now need explicit grants on `system.*`, `INFORMATION_SCHEMA.*` or `CLUSTER`, and the error is a behavior change rather than a lost grant.
+
+## Deep-dive statements
+
+Minimal grants follow this shape. Emit one statement per missing privilege, using the narrowest object and a role when one exists.
+
 ```sql
--- Direct grants
-GRANT SELECT ON system.processes TO user_x;
-GRANT SELECT ON INFORMATION_SCHEMA.COLUMNS TO svc_y;
-GRANT CLUSTER ON *.* TO svc_z;
-
--- Role-based grants (preferred)
 GRANT SELECT ON system.processes TO role_analytics;
+```
+
+```sql
 GRANT role_analytics TO user_x;
 ```
 
-Scope to the narrowest object that resolves the error: `db.table` (or a column list) over `db.*`, and `db.*` over `*.*`.
+## Report format
 
-## Security-sensitive grants — scope tightly
-Some privileges are exfiltration / SSRF / privilege-escalation surfaces. If the failing query needs one, grant the **narrowest** form and to a role, never broadly on `*.*`:
+1. **Header**: connection mode, cluster or "single node", ClickHouse version, time window.
+2. **Findings**: table with columns `check`, `severity`, `object`, `evidence`, `recommendation`; one row per finding, Critical first. Evidence quotes the numbers from the result rows.
+3. **OK checks**: one line listing the check ids that returned no problem rows.
+4. **Skipped and failed checks**: id and reason or first error line. Never omit this section.
+5. **Next steps**: skills to load next and immediate actions.
 
-- `SOURCES` / `S3` / `URL` / `FILE` / `REMOTE` (and `READ`/`WRITE` on 25.7+) — external read/write; broad grants enable data exfiltration and SSRF. Grant the specific source needed, not the `SOURCES` umbrella.
-- `SYSTEM`, `INTROSPECTION` — operational/internal exposure; scope to the specific subcommand.
-- `ACCESS MANAGEMENT`, `WITH GRANT OPTION`, `displaySecretsInShowAndSelect`, `NAMED COLLECTION ADMIN`, `ALLOW SQL SECURITY NONE`, `IMPERSONATE` — privilege-escalation/secret-exposure; do not grant these to fix a routine `ACCESS_DENIED` without explicit justification.
+## Next skills
 
-A grant that resolves an error but is broader than needed becomes a future audit finding — see the `altinity-expert-clickhouse-security` skill.
-
-## Post-Upgrade Compatibility Checks
-Verify `access_control_improvements` settings, which can change privilege requirements:
-
-- `select_from_system_db_requires_grant`
-- `select_from_information_schema_requires_grant`
-- `on_cluster_queries_require_cluster_grant`
-
-If these are enabled post-upgrade, users may require new explicit grants for `system.*`, `INFORMATION_SCHEMA.*`, or `CLUSTER`. The same `access_control_improvements` flags (plus the version-gated source/engine/definer changes) are covered from the audit side in `altinity-expert-clickhouse-security` → `references/14-version-specific-security-checks.md`; keep the two in sync.
-
-## Related skills
-This is the reactive **remediation** skill — it makes a legitimately-blocked operation work with the minimal grant. Its counterpart is `altinity-expert-clickhouse-security`, the proactive read-only **audit** skill: use that to review who has *too much* access, find exfiltration paths, weak auth, and exposure. Fixing an error here → grant minimally; reviewing posture → use security.
+- The question is who has too much access, rather than what is blocked → load skill `altinity-expert-clickhouse-security`
+- Version-specific privilege changes need confirmation against the audit-side checks → load skill `altinity-expert-clickhouse-security`
+- `system.query_log` is missing or truncated so failed queries cannot be found → load skill `altinity-expert-clickhouse-logs`
+- ON CLUSTER statements fail or hang after the grant is in place → load skill `altinity-expert-clickhouse-replication`

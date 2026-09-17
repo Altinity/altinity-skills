@@ -1,106 +1,58 @@
 ---
 name: altinity-expert-clickhouse-overview
-description: Runs a fast ClickHouse server health snapshot and routes to specialist skills. Use as the entry point for general health checks or when the problem area is not yet known.
+description: Fast ClickHouse server health snapshot (object counts, memory, disks, replication summary, system log TTLs, error rates, background pools, detached parts) that routes to the specialist skills. Use as the entry point for "is the server healthy" or when the problem area is not yet known.
 license: Apache-2.0
 ---
 
-## Predefined SQL
+# Health overview and routing
 
-Run reporting SQL queries from these files in this skill's directory:
-- checks.sql
-- metrics.sql
-- ddl_queue.sql
+Answers "is this server healthy, and which area needs a deeper look?" from `system.metrics`, `system.asynchronous_metrics`, `system.parts`, `system.disks`, `system.tables`, `system.query_log`, `system.errors` and `system.text_log`. It is single-host by design; per-replica divergence belongs to the specialist skills.
+Run `altinity-expert-clickhouse-connection` first if the connection mode, cluster and time window are not yet established.
 
-Inline SQL below (version/enablement sensitive):
+## Query packs
 
-### Detached Parts
+- `checks.sql` — 14 checks: object counts, memory vs RAM, primary-key and dictionary RAM, disk usage, replication summary, system log TTL and size, hourly query error rate, part_log errors, `system.errors` top codes, detached parts, recent warnings in `text_log`, background pool utilization.
+- `metrics.sql` — 13 alert checks (ids `A3.0.x`) that return rows only when a threshold is breached; an empty result is OK. Checks A3.0.4 and A3.0.5 have two version-specific alternatives (`@requires version<26.8` / `version>=26.8`): run the one matching the server version.
+- `ddl_queue.sql` — 1 check on the ON CLUSTER DDL queue; `@requires keeper`.
 
-version-dependent: ClickHouse 23.8 does not have modification_time
+## How to run the query packs
 
-```sql
-SELECT
-  hostName() AS host,
-  database,
-  table,
-  reason,
-  count() AS detached_parts,
-  formatReadableSize(sum(bytes_on_disk)) AS bytes,
-  min(modification_time) AS first_detach,
-  max(modification_time) AS last_detach
-FROM system.detached_parts
-GROUP BY host, database, table, reason
-ORDER BY detached_parts DESC
-LIMIT 100
-```
+1. Read each pack file from this skill's directory (the skill loader prints the directory path).
+2. Run statements one at a time, never a whole file. Statements end with `;` and start with a `-- @check <id> <title>` header; keep the id with its result.
+3. Honor `-- @requires`: skip the statement when the named table is missing, when `keeper` is required and the server has no Keeper/ZooKeeper, or when the version condition is not met. List skipped ids with the reason.
+4. Keep `{cluster}` as written when a cluster macro exists; otherwise apply the connection skill's rewrite rule. Any other `{placeholder}` is a template variable: substitute a real value first or skip the statement.
+5. On an error, record the check id and the first line of the error, then continue. Only for `UNKNOWN_IDENTIFIER`, run `DESCRIBE TABLE system.<table>` and drop the missing column.
+6. A `severity` column is the verdict for that row. Copy it; do not re-grade.
 
-### Text Log
-(may be disabled)
+## Interpretation rules
 
-```sql
-select event_date, level, thread_name, any(logger_name) as logger_name,
-       message_format_string, count(*) as count
-from   system.text_log
-where  event_date > now() - interval 24 hour
-  and level <= 'Warning'
-group by all
-order by level, thread_name, message_format_string
-```
+- `metrics.sql` checks that return no rows are OK; list their ids in the OK line. `Minor` rows are informational, not findings.
+- A system log table without TTL (overview-07) is a finding; quote its size from overview-08 next to it. Route to the logs skill only when the largest untended table exceeds a few GiB or the disk is above 70 percent.
+- Error rate (overview-09): say whether failures are steady or a spike, and name the top error codes from overview-11. Ignore codes caused by this diagnostic session itself (UNKNOWN_IDENTIFIER, UNKNOWN_TABLE, SYNTAX_ERROR).
+- Object counts (overview-01) and part counts are server-wide. When the largest part counts or sizes come from `system.*` tables, say so instead of blaming user tables.
+- Detached parts (overview-12) with reasons `broken*`, `unexpected*`, `ignored*` indicate replication or disk problems; `clone` and `covered-by-broken` are usually safe to remove.
+- Background pool utilization (overview-14) above 90 percent for MergesAndMutations means merges are throttled by capacity, not necessarily by data volume.
+- With `has_keeper = 0`, mark replication and DDL queue checks as not applicable rather than OK.
 
-### Check Pools
+## Report format
 
-```sql
-WITH
-    ['MergesAndMutations', 'Fetches', 'Move', 'Common', 'Schedule', 'BufferFlushSchedule', 'MessageBrokerSchedule', 'DistributedSchedule'] AS pool_tokens,
-    ['pool', 'fetches_pool', 'move_pool', 'common_pool', 'schedule_pool', 'buffer_flush_schedule_pool', 'message_broker_schedule_pool', 'distributed_schedule_pool'] AS setting_tokens
-SELECT
-    extract(m.metric, '^Background(.*)Task') AS pool_name,
-    m.active_tasks,
-    pool_size,
-    round(100.0 * m.active_tasks / pool_size, 1) AS utilization_pct,
-    multiIf(utilization_pct > 99, 'Major', utilization_pct > 90, 'Moderate', 'OK') AS severity
-FROM
-(
-    SELECT
-        metric,
-        value AS active_tasks,
-        transform(extract(metric, '^Background(.*)PoolTask'), pool_tokens, setting_tokens, '') AS pool_key,
-        concat('background_', lower(pool_key), '_size') AS setting_name
-    FROM system.metrics
-    WHERE metric LIKE 'Background%PoolTask'
-) AS m
-LEFT JOIN
-(
-    SELECT
-        name,
-        toFloat64OrZero(value) AS pool_size
-    FROM system.server_settings
-    WHERE name LIKE 'background%pool_size'
-) AS s ON s.name = m.setting_name
-WHERE pool_size > 0
-ORDER BY utilization_pct DESC
-```
+1. **Header**: connection mode, cluster or "single node", ClickHouse version, time window.
+2. **Findings**: table with columns `check`, `severity`, `object`, `evidence`, `recommendation`; one row per finding, Critical first. Evidence quotes the numbers from the result rows.
+3. **OK checks**: one line listing the check ids that returned no problem rows.
+4. **Skipped and failed checks**: id and reason or first error line. Never omit this section.
+5. **Next steps**: skills to load next and immediate actions.
 
-On error and for clickhouse version <= 22.8 replace system.server_settings to system.settings
+## Next skills
 
-## Report
-
-Prepare a summary report based on the findings
-
-
-## Routing Rules (Chain to Other Skills)
-
-Based on findings, load specific modules:
-
-- Replication lag/readonly replicas/Keeper issues → `altinity-expert-clickhouse-replication`
-- High memory usage or OOMs → `altinity-expert-clickhouse-memory`
-- Disk usage > 80% or poor compression → `altinity-expert-clickhouse-storage`
-- Many parts, merge backlog, or TOO_MANY_PARTS → `altinity-expert-clickhouse-merges`
-- Slow SELECTs / heavy reads in query_log → `altinity-expert-clickhouse-reporting`
-- Slow INSERTs / high part creation rate → `altinity-expert-clickhouse-ingestion`
-- Low cache hit ratios / cache pressure → `altinity-expert-clickhouse-caches`
-- Dictionary load failures or high dictionary memory → `altinity-expert-clickhouse-dictionaries`
-- Frequent exceptions or error spikes → include `system.errors` and `system.*_log` summaries below
-- System log TTL issues or log growth → `altinity-expert-clickhouse-logs`
-- Schema anti‑patterns (partitioning/ORDER BY/MV issues) → `altinity-expert-clickhouse-schema`
-- High load/connection saturation/queue buildup → `altinity-expert-clickhouse-metrics`
-- Suspicious server log entries → `altinity-expert-clickhouse-logs`
+- Read-only replicas, replica delay, replication queue growth, Keeper errors in text_log → load skill `altinity-expert-clickhouse-replication`
+- Memory above 80 percent of RAM, large primary-key or dictionary RAM, MEMORY_LIMIT_EXCEEDED errors → load skill `altinity-expert-clickhouse-memory`
+- Disk above 80 percent or large system log tables → load skill `altinity-expert-clickhouse-storage` (disk) or `altinity-expert-clickhouse-logs` (log TTL)
+- Many parts per partition, TOO_MANY_PARTS, saturated MergesAndMutations pool, part_log merge errors → load skill `altinity-expert-clickhouse-merges`
+- High query error rate or slow SELECTs → load skill `altinity-expert-clickhouse-reporting`
+- Slow or failing INSERTs, high NewPart rate → load skill `altinity-expert-clickhouse-ingestion`
+- Kafka consumers above pool size or Kafka warnings in text_log → load skill `altinity-expert-clickhouse-kafka`
+- Dictionary load failures or high dictionary RAM → load skill `altinity-expert-clickhouse-dictionaries`
+- Stuck or failing mutations in part_log errors → load skill `altinity-expert-clickhouse-mutations`
+- ACCESS_DENIED or authentication errors in system.errors → load skill `altinity-expert-clickhouse-grants`
+- Load, connection or pool saturation over time → load skill `altinity-expert-clickhouse-metrics`
+- Schema anti-patterns suspected (partitioning, ORDER BY, materialized views) → load skill `altinity-expert-clickhouse-schema`

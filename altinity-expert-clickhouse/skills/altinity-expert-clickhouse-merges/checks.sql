@@ -1,4 +1,5 @@
 -- 1) Current merge activity with memory and algorithm/type
+-- @check merges-01 Current merge activity with memory and algorithm/type
 select
     hostName() as host,
     database,
@@ -18,6 +19,7 @@ limit 100
 ;
 
 -- 2) Active merge memory summary by host
+-- @check merges-02 Active merge memory summary by host
 select
     hostName() as host,
     count() as active_merges,
@@ -30,6 +32,7 @@ limit 100
 ;
 
 -- 3) Active merge memory summary cluster-wide
+-- @check merges-03 Active merge memory summary cluster-wide
 select
     count() as active_merges,
     formatReadableSize(sum(memory_usage)) as cluster_total_merge_memory,
@@ -38,6 +41,8 @@ from clusterAllReplicas('{cluster}', system.merges)
 ;
 
 -- 4) Merge success/failure trend by hour (24h)
+-- @check merges-04 Merge success/failure trend by hour (24h)
+-- @requires table:system.part_log
 select
     hostName() as host,
     toStartOfHour(event_time) as hour,
@@ -52,6 +57,8 @@ limit 500
 ;
 
 -- 5) Table-level merge verdict summary (24h)
+-- @check merges-05 Table-level merge verdict summary (24h)
+-- @requires table:system.part_log
 select
     database,
     table,
@@ -68,6 +75,8 @@ limit 200
 ;
 
 -- 6) Merge reason + algorithm matrix (24h)
+-- @check merges-06 Merge reason + algorithm matrix (24h)
+-- @requires table:system.part_log
 select
     database,
     table,
@@ -90,6 +99,8 @@ limit 500
 ;
 
 -- 7) Peak merge RAM by table from part_log (24h)
+-- @check merges-07 Peak merge RAM by table from part_log (24h)
+-- @requires table:system.part_log
 select
     database,
     table,
@@ -109,6 +120,7 @@ limit 200
 ;
 
 -- 8) Part count offenders
+-- @check merges-08 Part count offenders
 select
     hostName() as host,
     database,
