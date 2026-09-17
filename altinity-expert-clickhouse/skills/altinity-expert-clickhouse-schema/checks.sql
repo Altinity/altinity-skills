@@ -3,6 +3,7 @@
 -- Critical: >1500 partitions with tiny median size - partitioning key too granular
 -- Major: >500 small partitions - consider coarser partitioning
 -- Ideal: Partitions 1-10GB each, hundreds not thousands of partitions
+-- @check schema-01 Partition Health Audit
 with
     median(b) as median_partition_size_bytes,
     median(r) as median_partition_size_rows,
@@ -44,6 +45,7 @@ limit 30
 -- Oversized Partitions (for *MergeTree engines)
 -- Why it matters: Aggregating/Replacing/etc engines need to merge entire partitions to collapse rows.
 -- Oversized partitions = incomplete deduplication.
+-- @check schema-02 Oversized Partitions (for *MergeTree engines)
 with
     max(partition_bytes) as max_partition_bytes
 select
@@ -97,6 +99,7 @@ from
 -- First ORDER BY column is high-cardinality ID → poor data locality
 -- Wide datatypes (UUID, DateTime64) → bloated primary key index
 -- Poor compression on PK column → indicates high cardinality
+-- @check schema-03 Primary Key Analysis
 with
     tables as (
         select
@@ -139,6 +142,7 @@ limit 30
 ;
 
 -- Column Count Check
+-- @check schema-04 Column Count Check
 with count() as columns
 select
     host,
@@ -162,6 +166,7 @@ order by columns desc, host asc
 
 -- Nullable Columns Audit
 -- Why avoid Nullable: Storage overhead, query complexity, NULL handling bugs.
+-- @check schema-05 Nullable Columns Audit
 with
     countIf(type like '%Nullable%') as nullable_columns,
     count() as total_columns
@@ -183,6 +188,7 @@ limit 30
 ;
 
 -- Long Names Check
+-- @check schema-06 Long Names Check
 select
     hostName() as host,
     format('{}.{}', database, name) as object,
@@ -206,6 +212,7 @@ limit 50
 ;
 
 -- MV Design Issues
+-- @check schema-07 MV Design Issues
 select
     hostName() as host,
     format('{}.{}', database, name) as object,
@@ -220,6 +227,7 @@ where engine = 'MaterializedView'
 ;
 
 -- MV Dependency Chain
+-- @check schema-08 MV Dependency Chain
 with count() as deps
 select
     hostName() as host,
@@ -236,6 +244,7 @@ order by deps desc, host asc
 ;
 
 -- Table Overview
+-- @check schema-09 Table Overview
 select
     hostName() as host,
     database,
@@ -255,6 +264,7 @@ limit 50
 ;
 
 -- Check table-level settings
+-- @check schema-10 Check table-level settings
 select
     hostName() as host,
     name, value, changed, description

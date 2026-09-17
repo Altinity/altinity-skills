@@ -1,4 +1,5 @@
 -- Current Mutations Status
+-- @check mutations-01 Current Mutations Status
 select
     hostName() as host,
     database,
@@ -17,6 +18,7 @@ order by create_time, host asc
 ;
 
 -- Mutation Summary by Table
+-- @check mutations-02 Mutation Summary by Table
 select
     hostName() as host,
     database,
@@ -32,6 +34,7 @@ order by pending desc, host asc
 ;
 
 -- Stuck Mutations Detection
+-- @check mutations-03 Stuck Mutations Detection
 with
     now() as current_time,
     dateDiff('minute', create_time, current_time) as age_minutes
@@ -53,6 +56,8 @@ order by create_time, host asc
 ;
 
 -- Recent Completed Mutations
+-- @check mutations-04 Recent Completed Mutations
+-- @requires table:system.part_log
 select
     hostName() as host,
     event_time,
@@ -71,6 +76,8 @@ limit 30
 ;
 
 -- Mutation Performance by Table
+-- @check mutations-05 Mutation Performance by Table
+-- @requires table:system.part_log
 select
     hostName() as host,
     database,
@@ -89,6 +96,8 @@ limit 30
 ;
 
 -- Failed Mutations in Part Log
+-- @check mutations-06 Failed Mutations in Part Log
+-- @requires table:system.part_log
 select
     hostName() as host,
     event_time,
@@ -107,6 +116,7 @@ limit 30
 ;
 
 -- Mutations Running Now
+-- @check mutations-07 Mutations Running Now
 select
     hostName() as host,
     database,
@@ -124,6 +134,7 @@ order by elapsed desc, host asc
 ;
 
 -- Parts Awaiting Mutation
+-- @check mutations-08 Parts Awaiting Mutation
 WITH
     parts_by_table AS
     (
@@ -158,6 +169,7 @@ ORDER BY m.parts_to_do DESC
 -- Mutation vs Merge Competition
 -- Check background pool saturation
 -- Mutations and merges share the same pool. If pool is saturated, mutations wait.
+-- @check mutations-09 Mutation vs Merge Competition
 select
     hostName() as host,
     metric,
@@ -168,6 +180,7 @@ where metric like 'Background%'
 
 -- Mutation Creation Rate
 -- Red flag: >1 mutation per 5 minutes sustained = mutation overload.
+-- @check mutations-10 Mutation Creation Rate
 select
     hostName() as host,
     toStartOfHour(create_time) as hour,
@@ -181,6 +194,7 @@ order by hour desc, host asc
 ;
 
 -- Mutation Types
+-- @check mutations-11 Mutation Types
 select
     hostName() as host,
     multiIf(

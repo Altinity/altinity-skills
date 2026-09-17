@@ -1,0 +1,96 @@
+name: Expert Skills SQL Matrix
+
+# Runs every statement of every altinity-expert-clickhouse query pack (and the
+# runnable fenced SQL in SKILL.md files) against ClickHouse 24.8, 25.8 and 26.8
+# containers configured as a one-node replicated cluster with embedded Keeper.
+# Any error not covered by a `-- @requires` header fails the job.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'altinity-expert-clickhouse/skills/**'
+      - 'altinity-expert-clickhouse/tests/sql-matrix/**'
+      - 'altinity-expert-clickhouse/tests/clickhouse-server/**'
+      - '.github/workflows/sql-matrix.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'altinity-expert-clickhouse/skills/**'
+      - 'altinity-expert-clickhouse/tests/sql-matrix/**'
+      - 'altinity-expert-clickhouse/tests/clickhouse-server/**'
+  workflow_dispatch:
+    inputs:
+      versions:
+        description: 'Space-separated ClickHouse image tags'
+        required: false
+        default: '24.8 25.8 26.8'
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Shell and Python syntax
+        run: |
+          set -euo pipefail
+          cd altinity-expert-clickhouse/tests
+          bash -n runner/run-test.sh runner/verify-report.sh runner/lib/common.sh sql-matrix/containers.sh opencode/run_eval.sh opencode/run_suite.sh
+          python3 -m py_compile sql-matrix/sql_matrix.py sql-matrix/annotate_packs.py opencode/assert_run.py opencode/summarize.py
+      - name: Every statement carries an @check header
+        run: |
+          set -euo pipefail
+          cd altinity-expert-clickhouse/tests
+          out="$(python3 sql-matrix/annotate_packs.py --skills ../skills --dry-run)"
+          echo "$out"
+          echo "$out" | grep -q 'total annotated: 0 ' || { echo "run: make -C tests annotate-packs" >&2; exit 1; }
+      - name: Shared SKILL.md sections are identical
+        run: |
+          set -euo pipefail
+          cd altinity-expert-clickhouse/skills
+          ref="$(awk '/^## How to run the query packs$/,/^## (Interpretation rules|Deep-dive statements)/' altinity-expert-clickhouse-overview/SKILL.md | grep -v '^## ')"
+          for d in altinity-expert-clickhouse-*/; do
+            [ "$d" = "altinity-expert-clickhouse-connection/" ] && continue
+            cur="$(awk '/^## How to run the query packs$/,/^## (Interpretation rules|Deep-dive statements)/' "$d/SKILL.md" | grep -v '^## ')"
+            [ "$cur" = "$ref" ] || { echo "$d: 'How to run the query packs' differs from the template" >&2; exit 1; }
+            grep -q "^name: ${d%/}$" "$d/SKILL.md" || { echo "$d: frontmatter name mismatch" >&2; exit 1; }
+          done
+
+  matrix:
+    runs-on: ubuntu-latest
+    needs: static
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install clickhouse-client
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
+          curl -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | sudo gpg --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg] https://packages.clickhouse.com/deb stable main" | sudo tee /etc/apt/sources.list.d/clickhouse.list
+          sudo apt-get update
+          sudo apt-get install -y clickhouse-client
+          clickhouse-client --version
+      - name: Start containers
+        run: |
+          cd altinity-expert-clickhouse/tests
+          ./sql-matrix/containers.sh up ${{ github.event.inputs.versions || '24.8 25.8 26.8' }}
+      - name: Run matrix
+        run: |
+          cd altinity-expert-clickhouse/tests
+          make sql-matrix MATRIX_VERSIONS="${{ github.event.inputs.versions || '24.8 25.8 26.8' }}"
+      - name: Summary
+        if: always()
+        run: |
+          cat altinity-expert-clickhouse/tests/results/sql-matrix.md >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sql-matrix-results
+          path: altinity-expert-clickhouse/tests/results/sql-matrix.*
+          if-no-files-found: ignore
+      - name: Stop containers
+        if: always()
+        run: |
+          cd altinity-expert-clickhouse/tests
+          ./sql-matrix/containers.sh down ${{ github.event.inputs.versions || '24.8 25.8 26.8' }}

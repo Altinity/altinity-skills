@@ -1,4 +1,5 @@
 -- Current Memory Overview
+-- @check memory-01 Current Memory Overview
 select
     hostName() as host,
     formatReadableSize(total) as total_ram,
@@ -24,6 +25,7 @@ from
 ;
 
 -- Memory Breakdown by Component
+-- @check memory-02 Memory Breakdown by Component
 select
     hostName() as host,
     'Dictionaries' as component,
@@ -117,6 +119,7 @@ order by size_bytes desc, host asc
 ;
 
 -- Memory Allocation Audit
+-- @check memory-03 Memory Allocation Audit
 select
     d.host as host,
     'Dictionaries + Memory Tables' as check_name,
@@ -188,6 +191,7 @@ left join
 ;
 
 -- Top Memory-Using Queries
+-- @check memory-04 Top Memory-Using Queries
 select
     hostName() as host,
     initial_query_id,
@@ -202,6 +206,7 @@ limit 15
 ;
 
 -- Top Memory-Using Dictionaries
+-- @check memory-05 Top Memory-Using Dictionaries
 select
     hostName() as host,
     database,
@@ -216,6 +221,7 @@ limit 20
 ;
 
 -- Top Memory-Using Tables (Memory Engine)
+-- @check memory-06 Top Memory-Using Tables (Memory Engine)
 select
     hostName() as host,
     database,
@@ -230,6 +236,7 @@ limit 20
 ;
 
 -- Top Primary Key Memory by Table
+-- @check memory-07 Top Primary Key Memory by Table
 select
     hostName() as host,
     database,
@@ -245,6 +252,8 @@ limit 20
 ;
 
 -- Memory Usage Over Time
+-- @check memory-08 Memory Usage Over Time
+-- @requires table:system.asynchronous_metric_log
 select
     hostName() as host,
     toStartOfFiveMinutes(event_time) as ts,
@@ -257,6 +266,7 @@ order by ts, host
 ;
 
 -- Recent Memory-Heavy Queries
+-- @check memory-09 Recent Memory-Heavy Queries
 select
     hostName() as host,
     event_time,
@@ -273,6 +283,7 @@ limit 20
 ;
 
 -- Memory Exceptions
+-- @check memory-10 Memory Exceptions
 select
     hostName() as host,
     event_time,
@@ -281,7 +292,7 @@ select
     substring(exception, 1, 200) as exception,
     substring(query, 1, 100) as query_preview
 from clusterAllReplicas('{cluster}', system.query_log)
-where type like 'Exception%'
+where type IN ('ExceptionBeforeStart', 'ExceptionWhileProcessing')
   and exception_code = 241
   and event_date >= today() - 1
 order by event_time desc, host asc
@@ -290,6 +301,8 @@ limit 30
 
 -- Memory Timeline Reconstruction
 -- Reconstructs memory usage peaks by operation type from query_log + part_log
+-- @check memory-11 Memory Timeline Reconstruction
+-- @requires table:system.part_log
 with
     now() - interval 6 hour as min_time,
     now() as max_time,
@@ -344,6 +357,7 @@ order by host, timeframe
 ;
 
 -- Current Memory Settings
+-- @check memory-12 Current Memory Settings
 select
     hostName() as host,
     name,
@@ -361,6 +375,7 @@ order by name, host asc
 ;
 
 -- Memory Used by Other Processes
+-- @check memory-13 Memory Used by Other Processes
 with
     (select toFloat64(value) from system.server_settings where name = 'max_server_memory_usage_to_ram_ratio') as max_ratio,
     (select value from system.asynchronous_metrics where metric = 'OSMemoryTotal') as total,
@@ -374,12 +389,13 @@ select
     formatReadableSize(used_by_others) as other_processes_memory,
     formatReadableSize(total * (1 - max_ratio)) as max_allowed_for_others,
     round(100.0 * used_by_others / total, 1) as pct_of_total,
-    multiIf(used_by_others > total * (1 - max_ratio), 'Critical', 'OK') as severity,
-    if(severity = 'Critical', 'Other processes consuming RAM reserved for ClickHouse', 'OK') as note
+    multiIf(used_by_others > total * (1 - max_ratio) * 2, 'Major', used_by_others > total * (1 - max_ratio), 'Moderate', 'OK') as severity,
+    if(severity != 'OK', 'Other processes use RAM beyond the headroom left by max_server_memory_usage_to_ram_ratio; expected on shared hosts or containers that see host memory, a real risk on dedicated servers', 'OK') as note
 ;
 
 -- High Memory from Aggregations
 -- Find queries with high memory aggregations
+-- @check memory-14 High Memory from Aggregations
 select
     normalized_query_hash,
     count() as executions,
@@ -397,6 +413,7 @@ limit 20
 ;
 
 -- High Memory from JOINs
+-- @check memory-15 High Memory from JOINs
 select
     normalized_query_hash,
     count() as executions,

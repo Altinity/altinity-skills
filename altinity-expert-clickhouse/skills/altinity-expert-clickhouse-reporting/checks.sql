@@ -1,4 +1,5 @@
 -- Current Running Queries
+-- @check reporting-01 Current Running Queries
 select
     hostName() as host,
     query_id,
@@ -15,11 +16,12 @@ limit 20
 ;
 
 -- Recent Query Performance Summary
+-- @check reporting-02 Recent Query Performance Summary
 select
     hostName() as host,
     toStartOfFiveMinutes(event_time) as ts,
     count() as queries,
-    countIf(type like 'Exception%') as failed,
+    countIf(type IN ('ExceptionBeforeStart', 'ExceptionWhileProcessing')) as failed,
     round(avg(query_duration_ms)) as avg_ms,
     round(quantile(0.95)(query_duration_ms)) as p95_ms,
     round(max(query_duration_ms)) as max_ms,
@@ -33,6 +35,7 @@ order by ts desc, host asc
 ;
 
 -- Slowest Queries (Last 24h)
+-- @check reporting-03 Slowest Queries (Last 24h)
 select
     hostName() as host,
     query_id,
@@ -52,6 +55,7 @@ limit 20
 ;
 
 -- Most Frequent Queries
+-- @check reporting-04 Most Frequent Queries
 select
     hostName() as host,
     normalized_query_hash,
@@ -72,6 +76,7 @@ limit 30
 ;
 
 -- Queries by CPU Time
+-- @check reporting-05 Queries by CPU Time
 select
     hostName() as host,
     normalized_query_hash,
@@ -93,6 +98,7 @@ limit 20
 -- Missing or ineffective indexes
 -- Poor ORDER BY alignment with query patterns
 -- Full table scans
+-- @check reporting-06 Queries Reading Too Much Data
 select
     hostName() as host,
     query_id,
@@ -113,6 +119,7 @@ limit 20
 ;
 
 -- Queries by Tables Accessed
+-- @check reporting-07 Queries by Tables Accessed
 select
     hostName() as host,
     arrayStringConcat(tables, ', ') as tables,
@@ -129,6 +136,7 @@ limit 30
 ;
 
 -- Recent Failures
+-- @check reporting-08 Recent Failures
 select
     hostName() as host,
     event_time,
@@ -137,7 +145,7 @@ select
     substring(exception, 1, 150) as exception,
     substring(query, 1, 100) as query_preview
 from clusterAllReplicas('{cluster}', system.query_log)
-where type like 'Exception%'
+where type IN ('ExceptionBeforeStart', 'ExceptionWhileProcessing')
   and event_date = today()
 order by event_time desc, host asc
 limit 30
@@ -150,13 +158,14 @@ limit 30
 -- 241 - Memory limit exceeded
 -- 159 - Timeout
 -- 252 - Too many parts
+-- @check reporting-09 Failure Summary by Error Code
 select
     hostName() as host,
     exception_code,
     count() as failures,
     any(substring(exception, 1, 100)) as example_exception
 from clusterAllReplicas('{cluster}', system.query_log)
-where type like 'Exception%'
+where type IN ('ExceptionBeforeStart', 'ExceptionWhileProcessing')
   and event_date = today()
 group by host, exception_code
 order by failures desc, host asc
@@ -164,6 +173,7 @@ limit 20
 ;
 
 -- Query Types Distribution
+-- @check reporting-10 Query Types Distribution
 select
     hostName() as host,
     query_kind,
@@ -179,6 +189,7 @@ order by queries desc, host asc
 ;
 
 -- Peak Query Hours
+-- @check reporting-11 Peak Query Hours
 select
     hostName() as host,
     toHour(event_time) as hour,
@@ -193,11 +204,12 @@ order by host, hour
 ;
 
 -- Queries by User
+-- @check reporting-12 Queries by User
 select
     hostName() as host,
     user,
     count() as queries,
-    countIf(type like 'Exception%') as failures,
+    countIf(type IN ('ExceptionBeforeStart', 'ExceptionWhileProcessing')) as failures,
     round(avg(query_duration_ms)) as avg_ms,
     formatReadableSize(sum(read_bytes)) as total_read
 from clusterAllReplicas('{cluster}', system.query_log)
@@ -207,6 +219,8 @@ order by queries desc, host asc
 ;
 
 -- MV Execution During Inserts
+-- @check reporting-13 MV Execution During Inserts
+-- @requires table:system.query_views_log
 select
     hostName() as host,
     view_name,
@@ -223,6 +237,8 @@ limit 20
 ;
 
 -- Slow MV Breakdown by Query
+-- @check reporting-14 Slow MV Breakdown by Query
+-- @requires table:system.query_views_log
 select
     hostName() as host,
     initial_query_id,
@@ -240,6 +256,7 @@ limit 30
 ;
 
 -- Distributed Query Performance
+-- @check reporting-15 Distributed Query Performance
 select
     hostName() as host,
     query_id,

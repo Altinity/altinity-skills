@@ -2,6 +2,7 @@
 # Run tests for ClickHouse diagnostic skills
 
 .PHONY: all test test-all test-all-codex test-all-claude test-all-gemini \
+	matrix-up matrix-down sql-matrix annotate-packs opencode-eval \
 	test-memory test-memory-codex test-memory-claude test-memory-gemini \
 	test-overview test-reporting test-ingestion test-merges test-mutations \
 	test-storage test-caches test-dictionaries test-logs \
@@ -45,6 +46,48 @@ ifeq ($(USE_DOCKER),1)
 	@$(MAKE) up
 endif
 	@./runner/lib/common.sh validate_connection
+
+# ---------------------------------------------------------------------------
+# SQL version matrix: run every statement of every skill query pack against
+# throwaway ClickHouse containers (one-node cluster with embedded Keeper).
+# ---------------------------------------------------------------------------
+MATRIX_VERSIONS ?= 24.8 25.8 26.8
+MATRIX_CLIENT ?= clickhouse-client
+
+matrix-up:
+	@./sql-matrix/containers.sh up $(MATRIX_VERSIONS)
+
+matrix-down:
+	@./sql-matrix/containers.sh down $(MATRIX_VERSIONS)
+
+sql-matrix:
+	@mkdir -p results
+	@python3 ./sql-matrix/sql_matrix.py --skills ../skills --client "$(MATRIX_CLIENT)" --include-skill-md \
+		$$(./sql-matrix/containers.sh endpoints $(MATRIX_VERSIONS) | sed 's/^/--endpoint /') \
+		--out results/sql-matrix.csv --summary results/sql-matrix.md
+
+# Add/refresh `-- @check` / `-- @requires` headers on query pack statements
+annotate-packs:
+	@python3 ./sql-matrix/annotate_packs.py --skills ../skills
+
+# ---------------------------------------------------------------------------
+# OpenCode behaviour evaluation (model under test runs the skills for real).
+#   make opencode-eval EVAL_MODEL=llmbox-01/qwen3.8-flash-next EVAL_PORT=19258 \
+#        EVAL_SKILLS="overview merges" EVAL_ARMS="none new"
+# ---------------------------------------------------------------------------
+EVAL_MODEL ?=
+EVAL_HOST ?= 127.0.0.1
+EVAL_PORT ?= 9000
+EVAL_SKILLS ?= overview merges memory
+EVAL_ARMS ?= none new
+EVAL_LABEL ?= eval
+EVAL_PARALLEL ?= 1
+
+opencode-eval:
+	@test -n "$(EVAL_MODEL)" || (echo "EVAL_MODEL=provider/model is required" && exit 1)
+	@./opencode/run_suite.sh --model "$(EVAL_MODEL)" --ch-host "$(EVAL_HOST)" --ch-port "$(EVAL_PORT)" \
+		--out results/opencode/$(EVAL_LABEL) --arms "$(EVAL_ARMS)" --skills "$(EVAL_SKILLS)" \
+		--parallel $(EVAL_PARALLEL) --label $(EVAL_LABEL)
 
 # Lint / static checks (no ClickHouse required)
 lint:
@@ -191,6 +234,11 @@ help:
 	@echo "  make test-memory-no-verify  Run without LLM verification"
 	@echo "  make validate          Check environment and connection"
 	@echo "  make lint              Run bash syntax checks (+ shellcheck if installed)"
+	@echo "  make matrix-up         Start ClickHouse containers for the SQL matrix (MATRIX_VERSIONS)"
+	@echo "  make sql-matrix        Run every skill statement against the matrix containers"
+	@echo "  make matrix-down       Remove the matrix containers"
+	@echo "  make annotate-packs    Add @check/@requires headers to query pack statements"
+	@echo "  make opencode-eval     Run OpenCode + model behaviour evaluation (EVAL_MODEL=...)"
 	@echo "  make up                Start Docker ClickHouse (USE_DOCKER=1)"
 	@echo "  make down              Stop Docker ClickHouse (USE_DOCKER=1)"
 	@echo "  make reset             Recreate Docker ClickHouse volume (USE_DOCKER=1)"

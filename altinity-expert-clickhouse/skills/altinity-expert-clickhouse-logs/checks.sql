@@ -1,4 +1,5 @@
 -- query_log should be enabled
+-- @check A0.2.01 query_log should be enabled
 with
 (select max(modification_time) from system.parts) -
 (select max(modification_time) from system.parts where database='system' and table='query_log') as lag
@@ -39,6 +40,7 @@ where age > 3600*24*30
 ;
 
 -- system log table should have TTL
+-- @check A0.2.04 system log table should have TTL
 SELECT
     'A0.2.04' AS id,
     format('{}.{}',database, name) AS object,
@@ -51,6 +53,7 @@ where database='system' and name like '%_log'
 ;
 
 -- system logs shall not allocate more than 20% available disk space
+-- @check A0.2.05 system logs shall not allocate more than 20% available disk space
 with used.sp/free.sp as ratio,
     max(ratio) as max_ratio
 SELECT
@@ -71,6 +74,7 @@ having max_ratio > 0.01
 ;
 
 -- there are no system.*_logN table (leftovers after version upgrade)
+-- @check A0.2.06 there are no system.*_logN table (leftovers after version upgrade)
 SELECT
     'A0.2.06' AS id,
     format('{}.{}',database, name) AS object,
@@ -82,6 +86,7 @@ where database='system' and match(name,'(.\w+)_log_(\d+)')
 ;
 
 -- system.query_thread_log is disabled
+-- @check A0.2.07 system.query_thread_log is disabled
 SELECT
     'A0.2.07' AS id,
     'System' AS object,
@@ -92,6 +97,8 @@ from clusterAllReplicas('{cluster}',system.tables)
 where database='system' and name='query_thread_log';
 
 -- crash_log has not recent records
+-- @check A0.2.08 crash_log has not recent records
+-- @requires table:system.crash_log
 with count() as crash_count
 SELECT
     'A0.2.08' AS id,

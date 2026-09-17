@@ -3,6 +3,7 @@
 -- Use only for problematic Kafka tables to avoid noisy output.
 -- Replace {cluster}, {db}, {kafka_table} with actual values.
 -- =============================================================================
+-- @check kafka-advanced-checks-01 Kafka Consumer Exception Drill-Down (Targeted)
 SELECT
     hostName() AS host,
     database,
@@ -27,16 +28,24 @@ LIMIT 50
 -- Consumption Speed (Snapshot-Based)
 -- Measures real-time consumption rate by comparing two snapshots.
 -- Step 1: Take snapshot. Step 2: Wait. Step 3: Calculate rate.
+--
+-- The three steps share a TEMPORARY table, so they must run in ONE client
+-- session (clickhouse-client --multiquery with all three statements, or an
+-- interactive session). They cannot run over MCP or as separate --query calls.
+-- Set --max_execution_time above the sleep length (default sleep: 30 s).
 -- =============================================================================
 
 -- Step 1: Take a snapshot
+-- @skip-matrix multi-step session recipe (temporary table)
 CREATE TEMPORARY TABLE kafka_consumers_dump AS
 SELECT now64(3) AS ts, * FROM system.kafka_consumers;
 
 -- Step 2: Wait (adjust sleep duration as needed)
-SELECT sleepEachRow(1) FROM numbers(60) SETTINGS max_block_size=1, max_threads=1 FORMAT Null;
+-- @skip-matrix multi-step session recipe (sleep)
+SELECT sleepEachRow(1) FROM numbers(30) SETTINGS max_block_size=1, max_threads=1, max_execution_time=120 FORMAT Null;
 
 -- Step 3: Calculate consumption rate
+-- @skip-matrix multi-step session recipe (temporary table)
 SELECT
     database,
     table,
@@ -62,6 +71,7 @@ ORDER BY per_sec
 -- =============================================================================
 
 -- Total Consumer Lag per Table
+-- @check kafka-advanced-checks-05 Total consumer lag per table (rdkafka_stat)
 WITH JSONExtract(
     rdkafka_stat,
     'Tuple(
@@ -98,6 +108,9 @@ ORDER BY total_lag DESC
 ;
 
 -- Detailed Lag per Partition
+-- (single ARRAY JOIN over a pre-flattened array: chained ARRAY JOINs over map
+--  keys/values fail on ClickHouse 25.8+ with "Not found column __array_join_exp")
+-- @check kafka-advanced-checks-06 Detailed Lag per Partition
 WITH JSONExtract(
     rdkafka_stat,
     'Tuple(
@@ -112,30 +125,33 @@ WITH JSONExtract(
         ))
     )'
 ) AS parsed_json,
-    tupleElement(parsed_json, 'topics') AS topics_map
+    tupleElement(parsed_json, 'topics') AS topics_map,
+    arrayFlatten(arrayMap(
+        t -> arrayMap(
+            p -> (t, p, tupleElement(topics_map[t], 'partitions')[p]),
+            mapKeys(tupleElement(topics_map[t], 'partitions'))
+        ),
+        mapKeys(topics_map)
+    )) AS topic_partitions
 SELECT
     hostName() AS host,
     database,
     table,
-    topic,
-    partition,
-    tupleElement(partition_data, 'consumer_lag') AS consumer_lag,
-    tupleElement(partition_data, 'committed_offset') AS committed_offset,
-    tupleElement(partition_data, 'hi_offset') AS hi_offset
+    tp.1 AS topic,
+    tp.2 AS partition,
+    tupleElement(tp.3, 'consumer_lag') AS consumer_lag,
+    tupleElement(tp.3, 'committed_offset') AS committed_offset,
+    tupleElement(tp.3, 'hi_offset') AS hi_offset
 FROM clusterAllReplicas('{cluster}', system.kafka_consumers)
-ARRAY JOIN
-    mapKeys(topics_map) AS topic,
-    mapValues(topics_map) AS topic_data
-ARRAY JOIN
-    mapKeys(tupleElement(topic_data, 'partitions')) AS partition,
-    mapValues(tupleElement(topic_data, 'partitions')) AS partition_data
-WHERE tupleElement(partition_data, 'consumer_lag') <> -1
+ARRAY JOIN topic_partitions AS tp
+WHERE consumer_lag <> -1
 ORDER BY consumer_lag DESC
 ;
 
 -- Broker Connection Health
 -- librdkafka counters: tx/rx are request/response COUNTS, txbytes/rxbytes are
 -- BYTES. Use the byte counters to attribute per-broker (and cross-AZ) traffic.
+-- @check kafka-advanced-checks-07 Broker Connection Health
 WITH JSONExtract(
     rdkafka_stat,
     'Tuple(

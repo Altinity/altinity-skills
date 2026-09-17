@@ -5,6 +5,8 @@
 */
 
 /* 0) Sanity: do we have part_log data? */
+-- @check part-log-01 Part log checks (cluster-wide by default)
+-- @requires table:system.part_log
 SELECT
   hostName() AS host,
   min(event_time) AS min_event_time,
@@ -15,6 +17,8 @@ GROUP BY host
 ORDER BY host;
 
 /* 1) Part activity timeline (last 6h): spikes by minute and event_type */
+-- @check part-log-02 Part activity timeline (last 6h): spikes by minute and event_type
+-- @requires table:system.part_log
 SELECT
   hostName() AS host,
   toStartOfMinute(event_time) AS minute,
@@ -33,6 +37,8 @@ LIMIT 500;
    - parts_per_min > 60  => >1 part/sec (high)
    - avg_rows_per_part < 10k or avg_part_size < 1MB => micro-batches (merge pressure)
 */
+-- @check part-log-03 Too many parts / micro-batching: NewPart rate by table (last 1h)
+-- @requires table:system.part_log
 SELECT
   hostName() AS host,
   database,
@@ -52,6 +58,8 @@ LIMIT 100;
    Interpretation:
    - new_parts >> merges => increasing part count / merge backlog risk
 */
+-- @check part-log-04 Merge balance: are merges keeping up? (last 1h)
+-- @requires table:system.part_log
 SELECT
   hostName() AS host,
   database,
@@ -68,6 +76,8 @@ ORDER BY new_parts DESC, host ASC
 LIMIT 100;
 
 /* 4) Slow merges: duration distribution (last 6h) */
+-- @check part-log-05 Slow merges: duration distribution (last 6h)
+-- @requires table:system.part_log
 SELECT
   hostName() AS host,
   database,
@@ -90,6 +100,8 @@ LIMIT 100;
    Interpretation:
    - high mutate_parts_per_min => ALTER UPDATE/DELETE touching many parts
 */
+-- @check part-log-06 Mutation storms: MutatePart rate by table (last 6h)
+-- @requires table:system.part_log
 SELECT
   hostName() AS host,
   database,
@@ -107,6 +119,7 @@ LIMIT 200;
 /* 6) Mutation backlog: outstanding mutations (cluster-wide use: load mutations skill)
    Note: schema varies by version; keep this query minimal.
 */
+-- @check part-log-07 Mutation backlog: outstanding mutations (cluster-wide use: load mutations skill)
 SELECT
   hostName() AS host,
   database,
@@ -124,6 +137,8 @@ LIMIT 100;
    Interpretation:
    - bursts of DownloadPart can indicate replica restarts, lag catch-up, network/disk issues, or part loss.
 */
+-- @check part-log-08 Replication churn: DownloadPart spikes (last 6h)
+-- @requires table:system.part_log
 SELECT
   hostName() AS host,
   database,
@@ -142,6 +157,8 @@ LIMIT 200;
    Interpretation:
    - could be TTL cleanup, DROP/DETACH PARTITION, mutation cleanup, or unexpected data loss; investigate top tables.
 */
+-- @check part-log-09 RemovePart spikes (last 6h)
+-- @requires table:system.part_log
 SELECT
   hostName() AS host,
   database,
@@ -160,6 +177,8 @@ LIMIT 200;
    Interpretation:
    - can indicate storage policy movement, disk rebalancing, or manual moves.
 */
+-- @check part-log-10 MovePart spikes (last 6h)
+-- @requires table:system.part_log
 SELECT
   hostName() AS host,
   database,
@@ -175,6 +194,8 @@ ORDER BY moves_per_min DESC, host ASC
 LIMIT 200;
 
 /* 10) Part-log errors: merges/mutations failing (last 24h) */
+-- @check part-log-11 Part-log errors: merges/mutations failing (last 24h)
+-- @requires table:system.part_log
 SELECT
   hostName() AS host,
   event_type,

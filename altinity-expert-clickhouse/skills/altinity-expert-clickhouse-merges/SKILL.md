@@ -1,136 +1,82 @@
 ---
 name: altinity-expert-clickhouse-merges
-description: Diagnose ClickHouse merge performance, part backlog, and 'too many parts' errors. Use for merge issues and part management problems.
+description: Diagnose ClickHouse merge performance, part backlog, merge memory, and "too many parts" errors. Use when merges look stopped or slow, parts pile up, TOO_MANY_PARTS or parts_to_throw_insert is hit, or merges fail with MEMORY_LIMIT_EXCEEDED.
 license: Apache-2.0
 ---
 
+# Merge health and part backlog
 
-## Diagnostics
+Answers "are merges running, for which tables, and what is holding them back?" from `system.merges`, `system.part_log` and `system.parts`.
+Run `altinity-expert-clickhouse-connection` first if the connection mode, cluster and time window are not yet established.
 
-Run all queries from `checks.sql` in this skill's directory (cluster-wide) one by one and produce a decision-ready report.
+## Query packs
 
-## Triage Order (Mandatory)
+- `checks.sql` — 8 checks: current merge activity with memory, algorithm and type (merges-01), active merge memory per host and cluster-wide (merges-02, merges-03), merge success/failure trend by hour (merges-04), table-level merge verdict (merges-05), merge reason and algorithm matrix (merges-06), peak merge RAM per table (merges-07), part-count offenders (merges-08). Checks merges-04 through merges-07 need `system.part_log`.
+- `reference.md` — background (merge and TTL settings, ad-hoc query safeguards); read only when you need to explain a recommendation.
 
-1. Check **current active merges** from `system.merges`.
-2. Check **merge success/failure trend** from `system.part_log`.
-3. Check **table-level status** (`merge_ok`, `merge_failed`, last success/failure).
-4. Check **merge reason + algorithm** (`merge_reason`, `merge_algorithm`).
-5. Check **merge RAM now + historical peak RAM** (`system.merges.memory_usage`, `system.part_log.peak_memory_usage`).
-6. Check **part-count offenders** with split:
-   - `database = 'system'`
-   - `database != 'system'`
-7. Check **relevant settings**, including TTL merge concurrency.
+## How to run the query packs
 
+1. Read each pack file from this skill's directory (the skill loader prints the directory path).
+2. Run statements one at a time, never a whole file. Statements end with `;` and start with a `-- @check <id> <title>` header; keep the id with its result.
+3. Honor `-- @requires`: skip the statement when the named table is missing, when `keeper` is required and the server has no Keeper/ZooKeeper, or when the version condition is not met. List skipped ids with the reason.
+4. Keep `{cluster}` as written when a cluster macro exists; otherwise apply the connection skill's rewrite rule. Any other `{placeholder}` is a template variable: substitute a real value first or skip the statement.
+5. On an error, record the check id and the first line of the error, then continue. Only for `UNKNOWN_IDENTIFIER`, run `DESCRIBE TABLE system.<table>` and drop the missing column.
+6. A `severity` column is the verdict for that row. Copy it; do not re-grade.
 
-## Decision Rules
+## Interpretation rules
 
-Use one of these final verdicts explicitly:
+Run the checks in id order: current merges first (merges-01), then the historical trend (merges-04), then the table-level verdict (merges-05), then reason and algorithm (merges-06), then RAM now and peak (merges-02, merges-03, merges-07), then part-count offenders (merges-08).
 
-- `PROVED`: cluster-wide merge stop (no successful merges in the selected window).
-- `DECLINED`: cluster-wide stop is false.
-- `PARTIAL`: merges are blocked for specific table(s) while others still merge.
+- End the report with exactly one verdict: `PROVED` (no successful merge anywhere in the window), `DECLINED` (merges are succeeding cluster-wide), or `PARTIAL` (specific tables are blocked while others still merge).
+- If any table has successful merges in the same window, the verdict is `PARTIAL` or `DECLINED`, never a global merge stop.
+- A table with `merge_ok = 0` and repeated `MEMORY_LIMIT_EXCEEDED` is a table-level block, not a cluster-wide one.
+- If merges are 100 percent `Horizontal`, say the planner chose horizontal merges. Do not claim the vertical algorithm is disabled unless the merge tree settings prove it.
+- When the largest part counts in merges-08 come from `system.*` tables, call out the alert-source mismatch so the finding is not misattributed to business tables.
+- Peak RAM from merges-07 is historical: a high peak with no current merge means the problem already happened, not that it is happening now.
+- `system.part_log` missing: merges-04 through merges-07 are skipped, so a cluster-wide merge stop is not provable. Say "not provable without part_log" instead of choosing a verdict.
 
-Additional rules:
-- If some tables still have successful merges in same timeframe, do **not** report global merge stop.
-- If a target table has `merge_ok = 0` with repeated `MEMORY_LIMIT_EXCEEDED`, report table-level block.
-- If merges are 100% `Horizontal`, state that planner selected horizontal merges (do not say vertical is disabled unless settings prove it).
-- If max part count is driven by `system.*` tables, call out alert-source mismatch to avoid misattribution to business tables.
+Structural causes worth naming when the evidence supports them:
 
----
+- A single hot partition (`partition_id = 'all'`) makes every merge re-read the whole table; recommend time-based partitioning.
+- A heavy `TTL ... GROUP BY ... SET ...` on a hot ingestion table serializes merges; move the rollup to a materialized view or a batch table and keep the base-table TTL delete-only.
+- Repeated large horizontal merges that fail with OOM point at row width and part size, not at pool capacity.
+- Persistent part growth with healthy merges means inserts outpace merges: fix the insert batch size and frequency, not the merge settings.
 
-## Problem-Specific Investigation
+## Deep-dive statements
 
-### "Too Many Parts" Investigation
-
-For a specific table, run ad-hoc checks (time-bound and limited):
-
-```sql
-select
-    toStartOfMinute(event_time) as minute,
-    countIf(event_type = 'NewPart') as new_parts,
-    countIf(event_type = 'MergeParts') as merges,
-    countIf(event_type = 'MergeParts') - countIf(event_type = 'NewPart') as net_reduction
-from system.part_log
-where database = '{database}'
-  and table = '{table}'
-  and event_time > now() - interval 1 hour
-group by minute
-order by minute desc
-limit 60
-```
-
-If `net_reduction` is negative consistently, inserts outpace merges.
-
-## TTL merge pressure and merge-size settings snapshot
-
-Check system.merge_tree_settings if modified
-Suggest changing (reducing or increasing) in case of a problem as remediation.
-
-- max_parts_to_merge_at_once
-- max_bytes_to_merge_at_max_space_in_pool
-- max_bytes_to_merge_at_min_space_in_pool
-- enable_vertical_merge_algorithm
-- vertical_merge_algorithm_min_rows_to_activate
-- vertical_merge_algorithm_min_columns_to_activate
-- max_number_of_merges_with_ttl_in_pool
-- max_replicated_merges_with_ttl_in_queue
-- parts_to_delay_insert
-- parts_to_throw_insert
-
-
-## Structural Fix Guidance (When Settings Are Not Enough)
-
-Call out anti-patterns explicitly:
-- Single hot partition (`partition_id='all'`)
-- Heavy `TTL ... GROUP BY ... SET ...` on a hot ingestion table
-- Persistent large horizontal merge attempts with OOM failures
-
-Recommended long-term direction:
-- Add time-based partitioning
-- Move heavy rollup logic from TTL path to MV/batch table
-- Keep base-table TTL simple (delete-oriented)
-
-
-## Ad-Hoc Query Guidelines
-
-### Required Safeguards
+Insert versus merge rate for one table over the last hour. Negative `net_reduction` sustained across minutes means inserts outpace merges.
 
 ```sql
--- Always include LIMIT
-limit 100
-
--- Always time-bound historical queries
-where event_time >= now() - interval 24 hour
-
--- For part_log, always filter event_type
-where event_type in ('NewPart', 'MergeParts', 'MutatePart')
+SELECT
+    toStartOfMinute(event_time) AS minute,
+    countIf(event_type = 'NewPart') AS new_parts,
+    countIf(event_type = 'MergeParts') AS merges,
+    countIf(event_type = 'MergeParts') - countIf(event_type = 'NewPart') AS net_reduction
+FROM system.part_log
+WHERE database = '{database}'
+  AND table = '{table}'
+  AND event_time > now() - INTERVAL 1 HOUR
+GROUP BY minute
+ORDER BY minute DESC
+LIMIT 60;
 ```
 
-### Avoid
-- `select * from system.part_log`
-- Unbounded scans on `*_log` tables
-- Large joins in-context (aggregate in SQL)
+## Report format
 
----
+1. **Header**: connection mode, cluster or "single node", ClickHouse version, time window.
+2. **Findings**: table with columns `check`, `severity`, `object`, `evidence`, `recommendation`; one row per finding, Critical first. Evidence quotes the numbers from the result rows.
+3. **OK checks**: one line listing the check ids that returned no problem rows.
+4. **Skipped and failed checks**: id and reason or first error line. Never omit this section.
+5. **Next steps**: skills to load next and immediate actions.
 
-## Cross-Module Triggers
+State the `PROVED`/`DECLINED`/`PARTIAL` verdict in the first line of the Findings section.
 
-| Finding | Load Module | Reason |
-|---------|-------------|--------|
-| High memory during merges / OOM | `altinity-expert-clickhouse-memory` | Memory limits and pressure |
-| Slow merges + normal disk | `altinity-expert-clickhouse-schema` | ORDER BY/partitioning anti-patterns |
-| Slow merges + high disk IO | `altinity-expert-clickhouse-storage` | Storage bottleneck |
-| Merges blocked by mutations | `altinity-expert-clickhouse-mutations` | Mutation backlog |
-| Replication lag + merge issues | `altinity-expert-clickhouse-replication` | Queue/replica bottlenecks |
+## Next skills
 
----
-
-## Final Report Sections (Mandatory)
-
-1. Environment header
-2. Global vs table-specific merge status
-3. Current and peak merge RAM
-4. Merge reason and merge algorithm findings
-5. Max-part offenders (`system` vs non-`system`)
-6. Current settings and recommended deltas
-7. Immediate mitigation and structural remediation
+- Merges fail with MEMORY_LIMIT_EXCEEDED or peak merge RAM is close to the limit → load skill `altinity-expert-clickhouse-memory`
+- Slow merges with normal disk throughput, or partitioning and ORDER BY look wrong → load skill `altinity-expert-clickhouse-schema`
+- Slow merges with high disk IO or a full disk → load skill `altinity-expert-clickhouse-storage`
+- Merge queue blocked behind mutations, or MutatePart errors → load skill `altinity-expert-clickhouse-mutations`
+- Replication lag or a growing replication queue alongside merge problems → load skill `altinity-expert-clickhouse-replication`
+- Part creation rate is the driver rather than merge capacity → load skill `altinity-expert-clickhouse-ingestion`
+- Detailed per-part history needed → load skill `altinity-expert-clickhouse-part-log`

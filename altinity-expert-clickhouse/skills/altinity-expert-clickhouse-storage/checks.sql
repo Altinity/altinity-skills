@@ -1,4 +1,5 @@
 -- Disk Space Audit
+-- @check storage-01 Disk Space Audit
 select
     hostName() as host,
     name as disk_name,
@@ -14,6 +15,7 @@ order by used_pct desc, host asc
 ;
 
 -- Storage by Database
+-- @check storage-02 Storage by Database
 select
     hostName() as host,
     database,
@@ -28,13 +30,14 @@ order by sum(total_bytes) desc, host asc
 ;
 
 -- Top Tables by Size
+-- @check storage-03 Top Tables by Size
 select
     hostName() as host,
     database,
     name,
     engine,
     formatReadableSize(total_bytes) as size,
-    formatReadableSize(total_rows) as rows,
+    formatReadableQuantity(total_rows) as rows,
     formatReadableSize(total_bytes / nullIf(total_rows, 0)) as avg_row_size,
     ifNull(p.parts, 0) as parts
 from clusterAllReplicas('{cluster}', system.tables) t
@@ -55,6 +58,7 @@ limit 30
 ;
 
 -- Disk Usage by Path
+-- @check storage-04 Disk Usage by Path
 select
     hostName() as host,
     substr(path, 1, position(path, '/store/')) as disk_path,
@@ -68,6 +72,7 @@ order by sum(bytes_on_disk) desc, host asc
 ;
 
 -- Overall Compression Ratio
+-- @check storage-05 Overall Compression Ratio
 select
     hostName() as host,
     formatReadableSize(sum(data_compressed_bytes)) as compressed,
@@ -78,6 +83,7 @@ where database not in ('system', 'INFORMATION_SCHEMA', 'information_schema')
 ;
 
 -- Compression by Table
+-- @check storage-06 Compression by Table
 select
     hostName() as host,
     database,
@@ -100,6 +106,7 @@ limit 30
 -- For sequential integers: CODEC(Delta, ZSTD)
 -- For timestamps: CODEC(DoubleDelta, ZSTD)
 -- For low-cardinality strings: LowCardinality(String)
+-- @check storage-07 Columns with Poor Compression
 select
     hostName() as host,
     database,
@@ -119,6 +126,7 @@ limit 30
 ;
 
 -- Part Size Distribution
+-- @check storage-08 Part Size Distribution
 select
     hostName() as host,
     database,
@@ -136,6 +144,7 @@ limit 30
 ;
 
 -- Small Parts Detection
+-- @check storage-09 Small Parts Detection
 select
     hostName() as host,
     database,
@@ -153,6 +162,7 @@ limit 30
 ;
 
 -- Wide vs Compact Parts
+-- @check storage-10 Wide vs Compact Parts
 select
     hostName() as host,
     database,
@@ -171,6 +181,7 @@ limit 30
 ;
 
 -- Disk IO Metrics
+-- @check storage-11 Disk IO Metrics
 select
     hostName() as host,
     metric,
@@ -182,6 +193,7 @@ order by metric, host asc
 ;
 
 -- Recent IO Activity from Query Log
+-- @check storage-12 Recent IO Activity from Query Log
 select
     hostName() as host,
     toStartOfFiveMinutes(event_time) as ts,
@@ -198,6 +210,7 @@ order by ts desc, host asc
 ;
 
 -- Queries with High IO
+-- @check storage-13 Queries with High IO
 select
     hostName() as host,
     query_id,
@@ -215,6 +228,7 @@ limit 20
 
 -- System Logs Disk Usage
 -- Check: If system logs > 5% of disk, add TTL or reduce retention.
+-- @check storage-14 System Logs Disk Usage
 select
     hostName() as host,
     table,
@@ -248,6 +262,7 @@ order by sum(bytes_on_disk) desc, host asc
 -- noquorum - Replication quorum not reached
 -- unexpected - Orphaned after failed operation
 -- clone - Leftover from ATTACH
+-- @check storage-15 Detached Parts
 select
     hostName() as host,
     database,
@@ -261,6 +276,7 @@ order by sum(bytes_on_disk) desc, host asc
 ;
 
 -- Storage Policies
+-- @check storage-16 Storage Policies
 select
     hostName() as host,
     policy_name,
@@ -274,6 +290,7 @@ order by policy_name, volume_priority, host asc
 ;
 
 -- Tables by Storage Policy
+-- @check storage-17 Tables by Storage Policy
 select
     hostName() as host,
     storage_policy,
@@ -286,6 +303,7 @@ order by sum(total_bytes) desc, host asc
 ;
 
 -- Disk Filling Up - What's growing fastest?
+-- @check storage-18 Disk Filling Up - What's growing fastest?
 select
     hostName() as host,
     database,
@@ -302,6 +320,8 @@ limit 20
 
 -- Slow Disk Detection
 -- Check merge speeds as proxy for disk performance
+-- @check storage-19 Slow Disk Detection
+-- @requires table:system.part_log
 select
     hostName() as host,
     database,

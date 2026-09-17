@@ -1,3 +1,4 @@
+-- @check grants-01 Access and authentication errors in system.errors (24h)
 SELECT
   code,
   name,
@@ -13,6 +14,7 @@ ORDER BY last_error_time DESC
 LIMIT 50
 ;
 
+-- @check grants-02 Missing privileges from failed queries (exception_code 497, 24h)
 SELECT
   missing_privileges,
   count(),
@@ -26,6 +28,7 @@ ORDER BY 2
 ;
 
 -- Current grants for affected users
+-- @check grants-03 Current grants for affected users
 WITH users AS (
   SELECT DISTINCT user
   FROM system.query_log
@@ -45,6 +48,7 @@ WHERE user_name IN (SELECT user FROM users)
 ORDER BY user, access_type, database, table, column
 ;
 -- Roles assigned to affected users
+-- @check grants-04 Roles assigned to affected users
 WITH users AS (
   SELECT DISTINCT user
   FROM system.query_log

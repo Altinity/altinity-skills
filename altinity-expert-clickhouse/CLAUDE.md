@@ -8,9 +8,13 @@ ClickHouse diagnostic skills for Claude Code and other LLM providers.
 altinity-expert-clickhouse/
 ├── skills/                     # Skill definitions (SKILL.md files)
 │   └── altinity-expert-clickhouse-*/
-│       └── SKILL.md           # Skill instructions with SQL queries
+│       ├── SKILL.md           # Procedure, interpretation rules, report format, routing
+│       ├── checks.sql (+ other packs)  # Statements with -- @check / -- @requires headers
+│       └── reference.md       # Optional background, read on demand
 ├── tests/                      # Test suite
 │   ├── Makefile               # Test targets
+│   ├── sql-matrix/            # Statement-level SQL matrix across ClickHouse versions
+│   ├── opencode/              # OpenCode + model behaviour evaluation harness
 │   ├── runner/                # Test orchestration
 │   │   ├── run-test.sh        # Main test runner
 │   │   ├── verify-report.sh   # LLM-based report verification
@@ -89,6 +93,19 @@ LLM_PROVIDER=claude make test-memory
 3. Add `dbschema.sql`, `prompt.md`, `expected.md`
 4. Add scenarios in `scenarios/` directory
 5. Add Makefile target in `tests/Makefile`
+
+## SQL matrix and OpenCode evaluation
+
+```bash
+cd tests
+make matrix-up                 # ClickHouse 24.8/25.8/26.8 containers (one-node cluster + Keeper)
+make sql-matrix                # every pack statement on every version; fails on undeclared errors
+make annotate-packs            # add @check/@requires headers to new statements
+make opencode-eval EVAL_MODEL=llmbox-01/qwen3.8-flash-next EVAL_PORT=9258 EVAL_SKILLS="overview merges" EVAL_ARMS="none new"
+make matrix-down
+```
+
+Skill authoring rules live in `SKILL_TEMPLATE.md`; conventions in `ARCHITECTURE.md`.
 
 ## Guidelines
 
