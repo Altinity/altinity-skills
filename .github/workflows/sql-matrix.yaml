@@ -39,11 +39,8 @@ jobs:
           python3 -m py_compile sql-matrix/sql_matrix.py sql-matrix/annotate_packs.py opencode/assert_run.py opencode/summarize.py
       - name: Every statement carries an @check header
         run: |
-          set -euo pipefail
           cd altinity-expert-clickhouse/tests
-          out="$(python3 sql-matrix/annotate_packs.py --skills ../skills --dry-run)"
-          echo "$out"
-          echo "$out" | grep -q 'total annotated: 0 ' || { echo "run: make -C tests annotate-packs" >&2; exit 1; }
+          python3 sql-matrix/annotate_packs.py --skills ../skills --check
       - name: Shared SKILL.md sections are identical
         run: |
           set -euo pipefail
@@ -61,23 +58,23 @@ jobs:
     needs: static
     steps:
       - uses: actions/checkout@v6
-      - name: Install clickhouse-client
-        run: |
-          set -euo pipefail
-          sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
-          curl -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | sudo gpg --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg] https://packages.clickhouse.com/deb stable main" | sudo tee /etc/apt/sources.list.d/clickhouse.list
-          sudo apt-get update
-          sudo apt-get install -y clickhouse-client
-          clickhouse-client --version
       - name: Start containers
         run: |
           cd altinity-expert-clickhouse/tests
           ./sql-matrix/containers.sh up ${{ github.event.inputs.versions || '24.8 25.8 26.8' }}
+      - name: Start client container
+        # The client runs from a ClickHouse image already pulled for the servers,
+        # on the host network, so no package repository is needed and the client
+        # is always new enough to talk to every server in the matrix.
+        run: |
+          docker run -d --name skillmatrix-client --network host \
+            --entrypoint sleep clickhouse/clickhouse-server:26.8 infinity
+          docker exec skillmatrix-client clickhouse-client --version
       - name: Run matrix
         run: |
           cd altinity-expert-clickhouse/tests
-          make sql-matrix MATRIX_VERSIONS="${{ github.event.inputs.versions || '24.8 25.8 26.8' }}"
+          make sql-matrix MATRIX_VERSIONS="${{ github.event.inputs.versions || '24.8 25.8 26.8' }}" \
+            MATRIX_CLIENT="docker exec -i skillmatrix-client clickhouse-client"
       - name: Summary
         if: always()
         run: |
@@ -93,4 +90,5 @@ jobs:
         if: always()
         run: |
           cd altinity-expert-clickhouse/tests
+          docker rm -f skillmatrix-client >/dev/null 2>&1 || true
           ./sql-matrix/containers.sh down ${{ github.event.inputs.versions || '24.8 25.8 26.8' }}

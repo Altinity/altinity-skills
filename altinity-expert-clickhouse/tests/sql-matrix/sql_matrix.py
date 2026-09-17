@@ -178,7 +178,10 @@ class Endpoint:
         pw = os.environ.get(self.args.password_env, "")
         if pw:
             env["CLICKHOUSE_PASSWORD"] = pw
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 60, env=env)
+        # stdin must be closed: a client that inherits it (notably `docker exec -i ...`)
+        # would consume whatever is feeding the caller, e.g. a piped shell script.
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 60, env=env,
+                              stdin=subprocess.DEVNULL)
 
     def preflight(self, timeout):
         r = self.client("SELECT version()", timeout)

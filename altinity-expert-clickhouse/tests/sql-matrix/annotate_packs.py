@@ -52,9 +52,16 @@ def file_short(fn):
     return "" if stem == "checks" else stem.replace("_", "-") + "-"
 
 
-def strip_sql_comments(sql):
+def strip_noise(sql):
+    """Remove comments and string literals so that only real table references remain.
+
+    A pack often names a system table inside a literal (a severity message, or
+    `'system.part_log' AS object`) while reading something else entirely, so
+    scanning the raw text would declare dependencies the statement does not have.
+    """
     sql = re.sub(r"/\*.*?\*/", " ", sql, flags=re.S)
     sql = re.sub(r"--[^\n]*", " ", sql)
+    sql = re.sub(r"'(?:[^'\\]|\\.)*'", "''", sql)
     return sql
 
 
@@ -136,7 +143,7 @@ def annotate_file(path, skill, rel, dry_run):
             check_id = "%s-%s%02d" % (skill_short(skill), file_short(rel), idx)
 
         needed = []
-        for t in sorted(set(TABLE_RE.findall(strip_sql_comments(sql_text)))):
+        for t in sorted(set(TABLE_RE.findall(strip_noise(sql_text)))):
             req = OPTIONAL_TABLES.get(t)
             if req and req not in declared and req not in needed:
                 needed.append(req)
@@ -165,8 +172,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--skills", required=True)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--check", action="store_true",
+                    help="report what is missing and exit 1 if any header would be added (implies --dry-run)")
     ap.add_argument("--skill", action="append", default=[])
     args = ap.parse_args()
+    if args.check:
+        args.dry_run = True
     total = 0
     for skill in sorted(os.listdir(args.skills)):
         sdir = os.path.join(args.skills, skill)
@@ -183,7 +194,11 @@ def main():
                         print("%s/%s: %d statements annotated" % (skill_short(skill), os.path.relpath(path, sdir), n))
                         total += n
     print("total annotated: %d%s" % (total, " (dry run)" if args.dry_run else ""))
+    if args.check and total:
+        print("query pack headers are out of date: run `make -C tests annotate-packs`", file=sys.stderr)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
